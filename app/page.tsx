@@ -58,7 +58,7 @@ export default function HomePage() {
   const [settings, setSettings] = useState<Settings>({ delivery_cost: '50.00', bulk_discount_enabled: 'true' })
 
   // Phone number for WhatsApp and calls
-  const phoneNumber = '263738649300'
+  const phoneNumber = '27849615725'
   const whatsappUrl = `https://wa.me/${phoneNumber}?text=Hi! I'm interested in your perfume collection.`
   const callUrl = `tel:+${phoneNumber}`
 
