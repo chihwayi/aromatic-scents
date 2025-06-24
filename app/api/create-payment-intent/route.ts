@@ -17,8 +17,8 @@ interface CartItem {
 
 export async function POST(request: NextRequest) {
   try {
-    const { items, includeDelivery, customerType }: { 
-      items: CartItem[], 
+    const { items, includeDelivery, customerType }: {
+      items: CartItem[],
       includeDelivery: boolean,
       customerType: 'regular' | 'reseller'
     } = await request.json()
@@ -38,11 +38,11 @@ export async function POST(request: NextRequest) {
         .select('value')
         .eq('key', 'delivery_cost')
         .single()
-      
+
       deliveryCost = settings ? parseFloat(settings.value) : 0
     }
 
-    // Calculate subtotal
+    // Calculate subtotal and total
     const subtotal = items.reduce((total, item) => total + (item.price * item.quantity), 0)
     const total = subtotal + deliveryCost
 
@@ -89,6 +89,7 @@ export async function POST(request: NextRequest) {
         includes_delivery: includeDelivery.toString(),
         delivery_cost: deliveryCost.toString(),
         subtotal: subtotal.toString(),
+        total: total.toString(), // Now using the total variable
         order_items: JSON.stringify(items.map(item => ({
           variantId: item.variantId,
           name: item.name,

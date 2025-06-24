@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ShoppingBag, Plus, Minus, Facebook, Instagram, Twitter, Mail, Phone, MapPin, Heart, Star, MessageCircle, Check } from 'lucide-react'
+import { ShoppingBag, Plus, Minus, Facebook, Instagram, Twitter, Mail, Phone, MapPin, Heart, Star, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { loadStripe } from '@stripe/stripe-js'
 import Image from 'next/image'
@@ -41,13 +41,18 @@ interface Settings {
   bulk_discount_enabled: string
 }
 
+interface SettingRow {
+  key: string
+  value: string
+}
+
 export default function HomePage() {
   const [products, setProducts] = useState<Product[]>([])
   const [cart, setCart] = useState<CartItem[]>([])
   const [isCartOpen, setIsCartOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [favorites, setFavorites] = useState<string[]>([])
-  const [selectedVariants, setSelectedVariants] = useState<{[key: string]: string}>({})
+  const [selectedVariants, setSelectedVariants] = useState<{ [key: string]: string }>({})
   const [customerType, setCustomerType] = useState<'regular' | 'reseller'>('regular')
   const [includeDelivery, setIncludeDelivery] = useState(false)
   const [settings, setSettings] = useState<Settings>({ delivery_cost: '50.00', bulk_discount_enabled: 'true' })
@@ -80,16 +85,16 @@ export default function HomePage() {
         .order('created_at', { ascending: false })
 
       if (error) throw error
-      
+
       // Filter products that have at least one variant with stock
-      const productsWithStock = (data || []).filter(product => 
+      const productsWithStock = (data || []).filter(product =>
         product.product_variants.some((variant: ProductVariant) => variant.stock_quantity > 0)
       )
-      
+
       setProducts(productsWithStock)
-      
+
       // Initialize selected variants (default to first available variant for each product)
-      const initialSelection: {[key: string]: string} = {}
+      const initialSelection: { [key: string]: string } = {}
       productsWithStock.forEach(product => {
         const availableVariant = product.product_variants.find((v: ProductVariant) => v.stock_quantity > 0)
         if (availableVariant) {
@@ -97,7 +102,7 @@ export default function HomePage() {
         }
       })
       setSelectedVariants(initialSelection)
-      
+
     } catch (error) {
       console.error('Error fetching products:', error)
     } finally {
@@ -113,10 +118,10 @@ export default function HomePage() {
 
       if (error) throw error
 
-      const settingsObj = data.reduce((acc: any, setting: any) => {
-        acc[setting.key] = setting.value
+      const settingsObj = data.reduce((acc: Settings, setting: SettingRow) => {
+        acc[setting.key as keyof Settings] = setting.value
         return acc
-      }, {})
+      }, {} as Settings)
 
       setSettings(settingsObj)
     } catch (error) {
@@ -130,11 +135,11 @@ export default function HomePage() {
   }
 
   const getEffectivePrice = (variant: ProductVariant, quantity: number): { price: number; isBulkPrice: boolean } => {
-    const isBulkEligible = customerType === 'reseller' && 
-                          variant.bulk_price && 
-                          quantity >= variant.bulk_min_quantity &&
-                          settings.bulk_discount_enabled === 'true'
-    
+    const isBulkEligible = customerType === 'reseller' &&
+      variant.bulk_price &&
+      quantity >= variant.bulk_min_quantity &&
+      settings.bulk_discount_enabled === 'true'
+
     return {
       price: isBulkEligible ? variant.bulk_price! : variant.regular_price,
       isBulkPrice: !!isBulkEligible
@@ -152,14 +157,14 @@ export default function HomePage() {
       if (existing) {
         const newQuantity = existing.quantity + 1
         const { price: newPrice, isBulkPrice: newIsBulkPrice } = getEffectivePrice(selectedVariant, newQuantity)
-        
+
         return prev.map(item =>
           item.variantId === selectedVariant.id
             ? { ...item, quantity: newQuantity, price: newPrice, isBulkPrice: newIsBulkPrice }
             : item
         )
       }
-      
+
       return [...prev, {
         variantId: selectedVariant.id,
         productId: product.id,
@@ -179,16 +184,16 @@ export default function HomePage() {
         if (item.variantId === variantId) {
           const newQuantity = item.quantity + change
           if (newQuantity <= 0) return null
-          
+
           // Find the variant to recalculate pricing
           const product = products.find(p => p.id === item.productId)
           const variant = product?.product_variants.find(v => v.id === variantId)
-          
+
           if (variant) {
             const { price, isBulkPrice } = getEffectivePrice(variant, newQuantity)
             return { ...item, quantity: newQuantity, price, isBulkPrice }
           }
-          
+
           return { ...item, quantity: newQuantity }
         }
         return item
@@ -196,13 +201,9 @@ export default function HomePage() {
     })
   }
 
-  const removeFromCart = (variantId: string) => {
-    setCart(prev => prev.filter(item => item.variantId !== variantId))
-  }
-
   const toggleFavorite = (productId: string) => {
-    setFavorites(prev => 
-      prev.includes(productId) 
+    setFavorites(prev =>
+      prev.includes(productId)
         ? prev.filter(id => id !== productId)
         : [...prev, productId]
     )
@@ -225,7 +226,7 @@ export default function HomePage() {
 
     try {
       setLoading(true)
-      
+
       const response = await fetch('/api/create-payment-intent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -299,11 +300,10 @@ export default function HomePage() {
                 <span className="text-sm text-gray-600">Customer Type:</span>
                 <button
                   onClick={() => setCustomerType(customerType === 'regular' ? 'reseller' : 'regular')}
-                  className={`px-3 py-1 rounded-full text-sm transition-all duration-300 ${
-                    customerType === 'reseller'
-                      ? 'bg-gradient-to-r from-rose-500 to-amber-500 text-white'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
+                  className={`px-3 py-1 rounded-full text-sm transition-all duration-300 ${customerType === 'reseller'
+                    ? 'bg-gradient-to-r from-rose-500 to-amber-500 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
                 >
                   {customerType === 'reseller' ? 'Reseller' : 'Regular'}
                 </button>
@@ -342,7 +342,7 @@ export default function HomePage() {
               </span>
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-12 leading-relaxed">
-              Discover our curated collection of premium perfumes, available in 35ml, 50ml, and 100ml bottles. 
+              Discover our curated collection of premium perfumes, available in 35ml, 50ml, and 100ml bottles.
               Each fragrance tells a unique story of elegance and sophistication.
             </p>
             {customerType === 'reseller' && settings.bulk_discount_enabled === 'true' && (
@@ -353,7 +353,7 @@ export default function HomePage() {
               </div>
             )}
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto mb-16">
             <div className="text-center p-6 bg-white/60 backdrop-blur-sm rounded-2xl border border-rose-100/50">
               <div className="w-12 h-12 bg-gradient-to-br from-rose-500 to-amber-500 rounded-full mx-auto mb-4 flex items-center justify-center">
@@ -387,12 +387,12 @@ export default function HomePage() {
             <h3 className="text-4xl font-light text-gray-800 mb-4">Our Collection</h3>
             <div className="w-24 h-1 bg-gradient-to-r from-rose-500 to-amber-500 mx-auto rounded-full"></div>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
             {products.map((product) => {
               const selectedVariant = getSelectedVariant(product)
               const effectivePrice = selectedVariant ? getEffectivePrice(selectedVariant, 1) : null
-              
+
               return (
                 <div
                   key={product.id}
@@ -410,17 +410,16 @@ export default function HomePage() {
                       onClick={() => toggleFavorite(product.id)}
                       className="absolute top-4 right-4 p-2 bg-white/80 backdrop-blur-sm rounded-full hover:bg-white transition-all duration-300"
                     >
-                      <Heart 
-                        className={`h-5 w-5 transition-colors ${
-                          favorites.includes(product.id) 
-                            ? 'text-rose-500 fill-current' 
-                            : 'text-gray-400 hover:text-rose-500'
-                        }`} 
+                      <Heart
+                        className={`h-5 w-5 transition-colors ${favorites.includes(product.id)
+                          ? 'text-rose-500 fill-current'
+                          : 'text-gray-400 hover:text-rose-500'
+                          }`}
                       />
                     </button>
                     <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                   </div>
-                  
+
                   <div className="p-8">
                     <h3 className="text-2xl font-light text-gray-800 mb-3">
                       {product.name}
@@ -428,7 +427,7 @@ export default function HomePage() {
                     <p className="text-gray-600 mb-6 text-sm leading-relaxed line-clamp-2">
                       {product.description}
                     </p>
-                    
+
                     {/* Size Selection */}
                     <div className="mb-6">
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -438,25 +437,24 @@ export default function HomePage() {
                         {product.product_variants
                           .sort((a, b) => a.size_ml - b.size_ml)
                           .map((variant) => (
-                          <button
-                            key={variant.id}
-                            onClick={() => setSelectedVariants(prev => ({
-                              ...prev,
-                              [product.id]: variant.id
-                            }))}
-                            disabled={variant.stock_quantity === 0}
-                            className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
-                              selectedVariants[product.id] === variant.id
+                            <button
+                              key={variant.id}
+                              onClick={() => setSelectedVariants(prev => ({
+                                ...prev,
+                                [product.id]: variant.id
+                              }))}
+                              disabled={variant.stock_quantity === 0}
+                              className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${selectedVariants[product.id] === variant.id
                                 ? 'bg-gradient-to-r from-rose-500 to-amber-500 text-white shadow-lg'
                                 : variant.stock_quantity > 0
                                   ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                   : 'bg-gray-50 text-gray-400 cursor-not-allowed'
-                            }`}
-                          >
-                            {variant.size_ml}ml
-                            {variant.stock_quantity === 0 && ' (Out of Stock)'}
-                          </button>
-                        ))}
+                                }`}
+                            >
+                              {variant.size_ml}ml
+                              {variant.stock_quantity === 0 && ' (Out of Stock)'}
+                            </button>
+                          ))}
                       </div>
                     </div>
 
@@ -475,21 +473,21 @@ export default function HomePage() {
                             )}
                           </div>
                         </div>
-                        
+
                         {/* Show regular price if bulk price is active */}
                         {effectivePrice.isBulkPrice && (
                           <div className="text-sm text-gray-500 line-through">
                             Regular: R{selectedVariant.regular_price.toFixed(2)}
                           </div>
                         )}
-                        
+
                         {/* Show bulk pricing info for resellers */}
                         {customerType === 'reseller' && selectedVariant.bulk_price && !effectivePrice.isBulkPrice && (
                           <div className="text-sm text-green-600 mt-1">
                             Bulk price: R{selectedVariant.bulk_price.toFixed(2)} (min {selectedVariant.bulk_min_quantity} items)
                           </div>
                         )}
-                        
+
                         <div className="flex items-center justify-between mt-2">
                           <div className="text-xs text-gray-500">
                             {selectedVariant.stock_quantity} in stock
@@ -508,8 +506,8 @@ export default function HomePage() {
                       disabled={!selectedVariant || selectedVariant.stock_quantity === 0}
                       className="w-full bg-gradient-to-r from-rose-500 to-amber-500 text-white px-8 py-3 rounded-full hover:from-rose-600 hover:to-amber-600 transition-all duration-300 font-medium shadow-lg hover:shadow-xl transform hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                     >
-                      {!selectedVariant || selectedVariant.stock_quantity === 0 
-                        ? 'Out of Stock' 
+                      {!selectedVariant || selectedVariant.stock_quantity === 0
+                        ? 'Out of Stock'
                         : 'Add to Cart'
                       }
                     </button>
@@ -534,7 +532,7 @@ export default function HomePage() {
                 <h3 className="text-3xl font-light">Aromatic Scents</h3>
               </div>
               <p className="text-gray-300 mb-8 leading-relaxed max-w-md">
-                Where passion meets perfection. We curate the world&apos;s finest fragrances to bring you an unparalleled 
+                Where passion meets perfection. We curate the world&apos;s finest fragrances to bring you an unparalleled
                 olfactory experience that defines your unique style and personality.
               </p>
               <div className="flex space-x-4">
@@ -606,7 +604,14 @@ export default function HomePage() {
           rel="noopener noreferrer"
           className="group relative w-14 h-14 bg-green-500 hover:bg-green-600 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center transform hover:scale-110"
         >
-          <MessageCircle className="h-7 w-7 text-white" />
+          {/* Custom WhatsApp SVG Icon */}
+          <svg
+            className="h-7 w-7 text-white"
+            fill="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.106" />
+          </svg>
           <div className="absolute right-16 top-1/2 transform -translate-y-1/2 bg-gray-800 text-white px-3 py-2 rounded-lg text-sm whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
             Chat on WhatsApp
             <div className="absolute left-full top-1/2 transform -translate-y-1/2 border-4 border-transparent border-l-gray-800"></div>
@@ -630,15 +635,27 @@ export default function HomePage() {
       {isCartOpen && (
         <div className="fixed inset-0 z-50 overflow-hidden">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsCartOpen(false)} />
-          <div className="absolute right-0 top-0 h-full w-full max-w-md bg-white shadow-2xl">
-            <div className="p-6 border-b bg-gradient-to-r from-rose-50 to-amber-50">
-              <h3 className="text-xl font-semibold text-gray-800">Shopping Cart</h3>
-              <p className="text-sm text-gray-600 mt-1">
-                {cart.length} {cart.length === 1 ? 'item' : 'items'} in your cart
-              </p>
+          <div className="absolute right-0 top-0 h-full w-full max-w-md bg-white shadow-2xl flex flex-col">
+            {/* Cart Header */}
+            <div className="p-6 border-b bg-gradient-to-r from-rose-50 to-amber-50 flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xl font-semibold text-gray-800">Shopping Cart</h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {cart.length} {cart.length === 1 ? 'item' : 'items'} in your cart
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsCartOpen(false)}
+                  className="p-2 hover:bg-gray-200 rounded-full transition-colors"
+                >
+                  <X className="h-5 w-5 text-gray-500" />
+                </button>
+              </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6" style={{ height: 'calc(100vh - 280px)' }}>
+            {/* Cart Items - Scrollable */}
+            <div className="flex-1 overflow-y-auto p-6">
               {cart.length === 0 ? (
                 <div className="text-center py-12">
                   <ShoppingBag className="h-16 w-16 text-gray-300 mx-auto mb-4" />
@@ -652,12 +669,12 @@ export default function HomePage() {
                       <Image
                         src={item.image_url}
                         alt={item.name}
-                        width={400}
-                        height={400}
-                        className="w-16 h-16 object-cover rounded-lg"
+                        width={64}
+                        height={64}
+                        className="w-16 h-16 object-cover rounded-lg flex-shrink-0"
                       />
-                      <div className="flex-1">
-                        <h4 className="font-medium text-gray-800">{item.name}</h4>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-medium text-gray-800 truncate">{item.name}</h4>
                         <div className="text-sm text-gray-500">{item.size}ml</div>
                         <div className="flex items-center space-x-2">
                           <span className="text-rose-600 font-semibold">R{item.price.toFixed(2)}</span>
@@ -668,7 +685,7 @@ export default function HomePage() {
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center space-x-3">
+                      <div className="flex items-center space-x-3 flex-shrink-0">
                         <button
                           onClick={() => updateQuantity(item.variantId, -1)}
                           className="p-1 hover:bg-gray-200 rounded-full transition-colors"
@@ -689,8 +706,9 @@ export default function HomePage() {
               )}
             </div>
 
+            {/* Cart Footer - Fixed at bottom */}
             {cart.length > 0 && (
-              <div className="border-t p-6 bg-gradient-to-r from-rose-50 to-amber-50">
+              <div className="border-t p-6 bg-gradient-to-r from-rose-50 to-amber-50 flex-shrink-0">
                 {/* Delivery Option */}
                 <div className="mb-4">
                   <label className="flex items-center space-x-3 cursor-pointer">
@@ -721,7 +739,7 @@ export default function HomePage() {
                   <div className="border-t pt-2">
                     <div className="flex justify-between items-center">
                       <span className="text-lg font-semibold text-gray-800">Total:</span>
-                      <span className="text-3xl font-bold bg-gradient-to-r from-rose-600 to-amber-600 bg-clip-text text-transparent">
+                      <span className="text-2xl font-bold bg-gradient-to-r from-rose-600 to-amber-600 bg-clip-text text-transparent">
                         R{getTotalPrice().toFixed(2)}
                       </span>
                     </div>
@@ -740,6 +758,7 @@ export default function HomePage() {
           </div>
         </div>
       )}
+
     </div>
   )
 }

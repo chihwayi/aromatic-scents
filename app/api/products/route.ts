@@ -1,6 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 
+// Define types for the request data
+interface ProductVariant {
+  size_ml: number
+  regular_price: number
+  bulk_price?: number
+  bulk_min_quantity?: number
+  stock_quantity: number
+}
+
+interface Product {
+  name: string
+  description: string
+  image_url: string
+}
+
+interface CreateProductRequest {
+  product: Product
+  variants: ProductVariant[]
+}
+
+interface UpdateProductRequest {
+  id: string
+  product: Product
+  variants: ProductVariant[]
+}
+
 export async function GET() {
   try {
     const { data, error } = await supabase
@@ -32,7 +58,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const { product, variants } = await request.json()
+    const { product, variants }: CreateProductRequest = await request.json()
 
     // Insert product first
     const { data: productData, error: productError } = await supabase
@@ -50,7 +76,7 @@ export async function POST(request: NextRequest) {
 
     // Insert variants
     if (variants && variants.length > 0) {
-      const variantInserts = variants.map((variant: any) => ({
+      const variantInserts = variants.map((variant: ProductVariant) => ({
         product_id: productId,
         size_ml: variant.size_ml,
         regular_price: variant.regular_price,
@@ -97,16 +123,16 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const { id, product, variants } = await request.json()
+    const { id, product, variants }: UpdateProductRequest = await request.json()
 
     // Update product
     const { error: productError } = await supabase
       .from('products')
-      .update({ 
+      .update({
         name: product.name,
         description: product.description,
         image_url: product.image_url,
-        updated_at: new Date().toISOString() 
+        updated_at: new Date().toISOString()
       })
       .eq('id', id)
 
@@ -122,7 +148,7 @@ export async function PUT(request: NextRequest) {
 
     // Insert new variants
     if (variants && variants.length > 0) {
-      const variantInserts = variants.map((variant: any) => ({
+      const variantInserts = variants.map((variant: ProductVariant) => ({
         product_id: id,
         size_ml: variant.size_ml,
         regular_price: variant.regular_price,
