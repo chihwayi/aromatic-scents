@@ -23,11 +23,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Calculate total amount (Stripe expects amounts in cents)
-    const totalAmount = items.reduce((total, item) => {
-      return total + (item.price * item.quantity * 100) // Convert to cents
-    }, 0)
-
     // Create Stripe checkout session
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
