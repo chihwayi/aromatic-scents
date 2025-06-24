@@ -5,7 +5,17 @@ export async function GET() {
   try {
     const { data, error } = await supabase
       .from('products')
-      .select('*')
+      .select(`
+        *,
+        product_variants (
+          id,
+          size_ml,
+          regular_price,
+          bulk_price,
+          bulk_min_quantity,
+          stock_quantity
+        )
+      `)
       .order('created_at', { ascending: false })
 
     if (error) throw error
@@ -22,16 +32,60 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const product = await request.json()
+    const { product, variants } = await request.json()
 
-    const { data, error } = await supabase
+    // Insert product first
+    const { data: productData, error: productError } = await supabase
       .from('products')
-      .insert([product])
+      .insert([{
+        name: product.name,
+        description: product.description,
+        image_url: product.image_url
+      }])
       .select()
 
-    if (error) throw error
+    if (productError) throw productError
 
-    return NextResponse.json(data[0])
+    const productId = productData[0].id
+
+    // Insert variants
+    if (variants && variants.length > 0) {
+      const variantInserts = variants.map((variant: any) => ({
+        product_id: productId,
+        size_ml: variant.size_ml,
+        regular_price: variant.regular_price,
+        bulk_price: variant.bulk_price,
+        bulk_min_quantity: variant.bulk_min_quantity,
+        stock_quantity: variant.stock_quantity
+      }))
+
+      const { error: variantError } = await supabase
+        .from('product_variants')
+        .insert(variantInserts)
+
+      if (variantError) throw variantError
+    }
+
+    // Fetch the complete product with variants
+    const { data: completeProduct, error: fetchError } = await supabase
+      .from('products')
+      .select(`
+        *,
+        product_variants (
+          id,
+          size_ml,
+          regular_price,
+          bulk_price,
+          bulk_min_quantity,
+          stock_quantity
+        )
+      `)
+      .eq('id', productId)
+      .single()
+
+    if (fetchError) throw fetchError
+
+    return NextResponse.json(completeProduct)
   } catch (error) {
     console.error('Error creating product:', error)
     return NextResponse.json(
@@ -43,17 +97,67 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const { id, ...product } = await request.json()
+    const { id, product, variants } = await request.json()
 
-    const { data, error } = await supabase
+    // Update product
+    const { error: productError } = await supabase
       .from('products')
-      .update({ ...product, updated_at: new Date().toISOString() })
+      .update({ 
+        name: product.name,
+        description: product.description,
+        image_url: product.image_url,
+        updated_at: new Date().toISOString() 
+      })
       .eq('id', id)
-      .select()
 
-    if (error) throw error
+    if (productError) throw productError
 
-    return NextResponse.json(data[0])
+    // Delete existing variants
+    const { error: deleteError } = await supabase
+      .from('product_variants')
+      .delete()
+      .eq('product_id', id)
+
+    if (deleteError) throw deleteError
+
+    // Insert new variants
+    if (variants && variants.length > 0) {
+      const variantInserts = variants.map((variant: any) => ({
+        product_id: id,
+        size_ml: variant.size_ml,
+        regular_price: variant.regular_price,
+        bulk_price: variant.bulk_price,
+        bulk_min_quantity: variant.bulk_min_quantity,
+        stock_quantity: variant.stock_quantity
+      }))
+
+      const { error: variantError } = await supabase
+        .from('product_variants')
+        .insert(variantInserts)
+
+      if (variantError) throw variantError
+    }
+
+    // Fetch the updated product with variants
+    const { data: updatedProduct, error: fetchError } = await supabase
+      .from('products')
+      .select(`
+        *,
+        product_variants (
+          id,
+          size_ml,
+          regular_price,
+          bulk_price,
+          bulk_min_quantity,
+          stock_quantity
+        )
+      `)
+      .eq('id', id)
+      .single()
+
+    if (fetchError) throw fetchError
+
+    return NextResponse.json(updatedProduct)
   } catch (error) {
     console.error('Error updating product:', error)
     return NextResponse.json(
@@ -75,6 +179,7 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
+    // Delete product (variants will be deleted automatically due to cascade)
     const { error } = await supabase
       .from('products')
       .delete()

@@ -2,26 +2,40 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Edit, Trash2, Save, X, LogOut, User, Package, DollarSign, TrendingUp } from 'lucide-react'
+import { Plus, Edit, Trash2, Save, X, LogOut, User, Package, DollarSign, TrendingUp, Settings } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 import Link from 'next/link' 
 import Image from 'next/image'
 
+interface ProductVariant {
+  id?: string
+  size_ml: number
+  regular_price: number
+  bulk_price: number
+  bulk_min_quantity: number
+  stock_quantity: number
+}
+
 interface Product {
   id?: string
   name: string
   description: string
-  price: number
   image_url: string
-  stock_quantity: number
+  product_variants?: ProductVariant[]
 }
 
 interface AdminStats {
   totalProducts: number
+  totalVariants: number
   totalValue: number
   lowStockItems: number
   recentOrders: number
+}
+
+interface AppSettings {
+  delivery_cost: string
+  bulk_discount_enabled: string
 }
 
 export default function AdminPanel() {
@@ -30,8 +44,14 @@ export default function AdminPanel() {
   const [isAddingNew, setIsAddingNew] = useState(false)
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<SupabaseUser | null>(null)
+  const [showSettings, setShowSettings] = useState(false)
+  const [settings, setSettings] = useState<AppSettings>({
+    delivery_cost: '50.00',
+    bulk_discount_enabled: 'true'
+  })
   const [stats, setStats] = useState<AdminStats>({
     totalProducts: 0,
+    totalVariants: 0,
     totalValue: 0,
     lowStockItems: 0,
     recentOrders: 0
@@ -41,36 +61,65 @@ export default function AdminPanel() {
   const emptyProduct: Product = {
     name: '',
     description: '',
-    price: 0,
     image_url: '',
-    stock_quantity: 0
+    product_variants: [
+      { size_ml: 35, regular_price: 0, bulk_price: 0, bulk_min_quantity: 6, stock_quantity: 0 },
+      { size_ml: 50, regular_price: 0, bulk_price: 0, bulk_min_quantity: 6, stock_quantity: 0 },
+      { size_ml: 100, regular_price: 0, bulk_price: 0, bulk_min_quantity: 4, stock_quantity: 0 }
+    ]
   }
 
   const calculateStats = useCallback((products: Product[]) => {
     const totalProducts = products.length
-    const totalValue = products.reduce((sum, product) => sum + (product.price * product.stock_quantity), 0)
-    const lowStockItems = products.filter(product => product.stock_quantity < 5).length
-    const recentOrders = 0 // This would need to be fetched from an orders table
+    let totalVariants = 0
+    let totalValue = 0
+    let lowStockItems = 0
+
+    products.forEach(product => {
+      if (product.product_variants) {
+        totalVariants += product.product_variants.length
+        product.product_variants.forEach(variant => {
+          totalValue += variant.regular_price * variant.stock_quantity
+          if (variant.stock_quantity < 5) {
+            lowStockItems++
+          }
+        })
+      }
+    })
+
+    const recentOrders = 0 // This would need to be fetched from orders table
 
     setStats({
       totalProducts,
+      totalVariants,
       totalValue,
       lowStockItems,
       recentOrders
     })
   }, [])
 
+  const fetchSettings = useCallback(async () => {
+    try {
+      const response = await fetch('/api/settings')
+      if (response.ok) {
+        const data = await response.json()
+        setSettings(data)
+      }
+    } catch (error) {
+      console.error('Error fetching settings:', error)
+    }
+  }, [])
+
   const fetchProducts = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
-      const productsData = data || []
-      setProducts(productsData)
-      calculateStats(productsData)
+      const response = await fetch('/api/products')
+      if (response.ok) {
+        const data = await response.json()
+        setProducts(data)
+        calculateStats(data)
+      } else {
+        throw new Error('Failed to fetch products')
+      }
     } catch (error) {
       console.error('Error fetching products:', error)
     } finally {
@@ -95,12 +144,12 @@ export default function AdminPanel() {
       }
 
       setUser(session.user)
-      await fetchProducts()
+      await Promise.all([fetchProducts(), fetchSettings()])
     } catch (error) {
       console.error('Auth check failed:', error)
       router.push('/admin/login')
     }
-  }, [router, fetchProducts])
+  }, [router, fetchProducts, fetchSettings])
 
   useEffect(() => {
     checkAuth()
@@ -117,34 +166,19 @@ export default function AdminPanel() {
 
   const saveProduct = async (product: Product) => {
     try {
-      if (product.id) {
-        // Update existing product
-        const { error } = await supabase
-          .from('products')
-          .update({
-            name: product.name,
-            description: product.description,
-            price: product.price,
-            image_url: product.image_url,
-            stock_quantity: product.stock_quantity,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', product.id)
-        
-        if (error) throw error
-      } else {
-        // Add new product
-        const { error } = await supabase
-          .from('products')
-          .insert([{
-            name: product.name,
-            description: product.description,
-            price: product.price,
-            image_url: product.image_url,
-            stock_quantity: product.stock_quantity
-          }])
-        
-        if (error) throw error
+      const method = product.id ? 'PUT' : 'POST'
+      const body = product.id 
+        ? { id: product.id, product: { name: product.name, description: product.description, image_url: product.image_url }, variants: product.product_variants }
+        : { product: { name: product.name, description: product.description, image_url: product.image_url }, variants: product.product_variants }
+
+      const response = await fetch('/api/products', {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to save product')
       }
 
       fetchProducts()
@@ -157,19 +191,41 @@ export default function AdminPanel() {
   }
 
   const deleteProduct = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this product?')) return
+    if (!confirm('Are you sure you want to delete this product and all its variants?')) return
 
     try {
-      const { error } = await supabase
-        .from('products')
-        .delete()
-        .eq('id', id)
-      
-      if (error) throw error
+      const response = await fetch(`/api/products?id=${id}`, {
+        method: 'DELETE'
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to delete product')
+      }
+
       fetchProducts()
     } catch (error) {
       console.error('Error deleting product:', error)
       alert('Error deleting product. Please try again.')
+    }
+  }
+
+  const saveSettings = async (newSettings: AppSettings) => {
+    try {
+      const response = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newSettings)
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to save settings')
+      }
+
+      setSettings(newSettings)
+      setShowSettings(false)
+    } catch (error) {
+      console.error('Error saving settings:', error)
+      alert('Error saving settings. Please try again.')
     }
   }
 
@@ -182,11 +238,25 @@ export default function AdminPanel() {
 
     const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault()
-      if (!formData.name || !formData.price) {
-        alert('Please fill in all required fields')
+      if (!formData.name) {
+        alert('Please fill in the product name')
         return
       }
+      
+      // Validate that at least one variant has pricing
+      const hasValidVariant = formData.product_variants?.some(v => v.regular_price > 0)
+      if (!hasValidVariant) {
+        alert('Please set prices for at least one bottle size')
+        return
+      }
+
       onSave(formData)
+    }
+
+    const updateVariant = (index: number, field: keyof ProductVariant, value: number) => {
+      const updatedVariants = [...(formData.product_variants || [])]
+      updatedVariants[index] = { ...updatedVariants[index], [field]: value }
+      setFormData({ ...formData, product_variants: updatedVariants })
     }
 
     return (
@@ -216,34 +286,6 @@ export default function AdminPanel() {
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Price (R) *
-            </label>
-            <input
-              type="number"
-              step="0.01"
-              value={formData.price}
-              onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all duration-300"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Stock Quantity
-            </label>
-            <input
-              type="number"
-              value={formData.stock_quantity}
-              onChange={(e) => setFormData({ ...formData, stock_quantity: parseInt(e.target.value) || 0 })}
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all duration-300"
-            />
-          </div>
-        </div>
-
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Image URL
@@ -255,6 +297,58 @@ export default function AdminPanel() {
             className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all duration-300"
             placeholder="https://example.com/image.jpg"
           />
+        </div>
+
+        <div>
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Bottle Sizes & Pricing</h3>
+          <div className="space-y-4">
+            {formData.product_variants?.map((variant, index) => (
+              <div key={variant.size_ml} className="grid grid-cols-5 gap-4 p-4 bg-gray-50 rounded-xl">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Size</label>
+                  <div className="text-sm font-medium text-gray-900">{variant.size_ml}ml</div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Regular Price (R)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={variant.regular_price}
+                    onChange={(e) => updateVariant(index, 'regular_price', parseFloat(e.target.value) || 0)}
+                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-rose-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Bulk Price (R)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={variant.bulk_price}
+                    onChange={(e) => updateVariant(index, 'bulk_price', parseFloat(e.target.value) || 0)}
+                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-rose-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Min Bulk Qty</label>
+                  <input
+                    type="number"
+                    value={variant.bulk_min_quantity}
+                    onChange={(e) => updateVariant(index, 'bulk_min_quantity', parseInt(e.target.value) || 1)}
+                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-rose-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Stock</label>
+                  <input
+                    type="number"
+                    value={variant.stock_quantity}
+                    onChange={(e) => updateVariant(index, 'stock_quantity', parseInt(e.target.value) || 0)}
+                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-rose-500"
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="flex space-x-4 pt-4">
@@ -275,6 +369,65 @@ export default function AdminPanel() {
           </button>
         </div>
       </form>
+    )
+  }
+
+  const SettingsForm = () => {
+    const [formSettings, setFormSettings] = useState(settings)
+
+    const handleSubmit = (e: React.FormEvent) => {
+      e.preventDefault()
+      saveSettings(formSettings)
+    }
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
+          <h3 className="text-xl font-semibold text-gray-900 mb-6">Application Settings</h3>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Delivery Cost (R)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                value={formSettings.delivery_cost}
+                onChange={(e) => setFormSettings({ ...formSettings, delivery_cost: e.target.value })}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Bulk Discount Enabled
+              </label>
+              <select
+                value={formSettings.bulk_discount_enabled}
+                onChange={(e) => setFormSettings({ ...formSettings, bulk_discount_enabled: e.target.value })}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500"
+              >
+                <option value="true">Yes</option>
+                <option value="false">No</option>
+              </select>
+            </div>
+            <div className="flex space-x-4 pt-4">
+              <button
+                type="submit"
+                className="flex-1 px-4 py-2 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-colors"
+              >
+                Save Settings
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowSettings(false)}
+                className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-xl hover:bg-gray-600 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
     )
   }
 
@@ -306,6 +459,13 @@ export default function AdminPanel() {
             </div>
             
             <div className="flex items-center space-x-4">
+              <button
+                onClick={() => setShowSettings(true)}
+                className="flex items-center px-4 py-2 text-gray-600 hover:text-rose-600 transition-colors duration-300"
+              >
+                <Settings className="h-4 w-4 mr-2" />
+                Settings
+              </button>
               <div className="flex items-center space-x-3 text-sm text-gray-600">
                 <User className="h-4 w-4" />
                 <span>{user?.email}</span>
@@ -361,7 +521,7 @@ export default function AdminPanel() {
                 <TrendingUp className="h-6 w-6 text-white" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Low Stock Items</p>
+                <p className="text-sm font-medium text-gray-600">Low Stock Variants</p>
                 <p className="text-2xl font-bold text-gray-900">{stats.lowStockItems}</p>
               </div>
             </div>
@@ -373,8 +533,8 @@ export default function AdminPanel() {
                 <Package className="h-6 w-6 text-white" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Recent Orders</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.recentOrders}</p>
+                <p className="text-sm font-medium text-gray-600">Product Variants</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.totalVariants}</p>
               </div>
             </div>
           </div>
@@ -433,7 +593,7 @@ export default function AdminPanel() {
             <div className="divide-y divide-gray-200">
               {products.map((product) => (
                 <div key={product.id} className="p-8 hover:bg-gray-50/50 transition-colors duration-300">
-                  <div className="flex items-center space-x-6">
+                  <div className="flex items-start space-x-6">
                     <Image
                       src={product.image_url || 'https://via.placeholder.com/100'}
                       alt={product.name}
@@ -447,17 +607,25 @@ export default function AdminPanel() {
                     
                     <div className="flex-1">
                       <h3 className="text-xl font-semibold text-gray-900 mb-2">{product.name}</h3>
-                      <p className="text-gray-600 text-sm mb-3 line-clamp-2">{product.description}</p>
-                      <div className="flex space-x-6 text-sm">
-                        <span className="flex items-center text-green-600 font-medium">
-                          R{product.price.toFixed(2)}
-                        </span>
-                        <span className={`flex items-center font-medium ${
-                          product.stock_quantity < 5 ? 'text-red-600' : 'text-gray-600'
-                        }`}>
-                          <Package className="h-4 w-4 mr-1" />
-                          {product.stock_quantity} in stock
-                        </span>
+                      <p className="text-gray-600 text-sm mb-4 line-clamp-2">{product.description}</p>
+                      
+                      {/* Product Variants */}
+                      <div className="space-y-2">
+                        <h4 className="text-sm font-medium text-gray-700">Available Sizes:</h4>
+                        <div className="grid grid-cols-3 gap-3">
+                          {product.product_variants?.map((variant) => (
+                            <div key={variant.id} className="bg-gray-50 rounded-lg p-3 text-xs">
+                              <div className="font-medium text-gray-900">{variant.size_ml}ml</div>
+                              <div className="text-green-600">R{variant.regular_price.toFixed(2)}</div>
+                              {variant.bulk_price > 0 && (
+                                <div className="text-blue-600">Bulk: R{variant.bulk_price.toFixed(2)}</div>
+                              )}
+                              <div className={`${variant.stock_quantity < 5 ? 'text-red-600' : 'text-gray-600'}`}>
+                                Stock: {variant.stock_quantity}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </div>
 
@@ -482,6 +650,9 @@ export default function AdminPanel() {
           )}
         </div>
       </div>
+
+      {/* Settings Modal */}
+      {showSettings && <SettingsForm />}
     </div>
   )
 }

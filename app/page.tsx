@@ -1,24 +1,44 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ShoppingBag, Plus, Minus, Facebook, Instagram, Twitter, Mail, Phone, MapPin, Heart, Star } from 'lucide-react'
+import { ShoppingBag, Plus, Minus, Facebook, Instagram, Twitter, Mail, Phone, MapPin, Heart, Star, MessageCircle, Check } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { loadStripe } from '@stripe/stripe-js'
 import Image from 'next/image'
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
 
+interface ProductVariant {
+  id: string
+  size_ml: number
+  regular_price: number
+  bulk_price: number | null
+  bulk_min_quantity: number
+  stock_quantity: number
+}
+
 interface Product {
   id: string
   name: string
   description: string
-  price: number
   image_url: string
-  stock_quantity: number
+  product_variants: ProductVariant[]
 }
 
-interface CartItem extends Product {
+interface CartItem {
+  variantId: string
+  productId: string
+  name: string
+  size: number
+  price: number
   quantity: number
+  isBulkPrice: boolean
+  image_url: string
+}
+
+interface Settings {
+  delivery_cost: string
+  bulk_discount_enabled: string
 }
 
 export default function HomePage() {
@@ -27,20 +47,57 @@ export default function HomePage() {
   const [isCartOpen, setIsCartOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [favorites, setFavorites] = useState<string[]>([])
+  const [selectedVariants, setSelectedVariants] = useState<{[key: string]: string}>({})
+  const [customerType, setCustomerType] = useState<'regular' | 'reseller'>('regular')
+  const [includeDelivery, setIncludeDelivery] = useState(false)
+  const [settings, setSettings] = useState<Settings>({ delivery_cost: '50.00', bulk_discount_enabled: 'true' })
+
+  // Phone number for WhatsApp and calls
+  const phoneNumber = '263738649300'
+  const whatsappUrl = `https://wa.me/${phoneNumber}?text=Hi! I'm interested in your perfume collection.`
+  const callUrl = `tel:+${phoneNumber}`
 
   useEffect(() => {
     fetchProducts()
+    fetchSettings()
   }, [])
 
   const fetchProducts = async () => {
     try {
       const { data, error } = await supabase
         .from('products')
-        .select('*')
-        .gt('stock_quantity', 0)
+        .select(`
+          *,
+          product_variants (
+            id,
+            size_ml,
+            regular_price,
+            bulk_price,
+            bulk_min_quantity,
+            stock_quantity
+          )
+        `)
+        .order('created_at', { ascending: false })
 
       if (error) throw error
-      setProducts(data || [])
+      
+      // Filter products that have at least one variant with stock
+      const productsWithStock = (data || []).filter(product => 
+        product.product_variants.some((variant: ProductVariant) => variant.stock_quantity > 0)
+      )
+      
+      setProducts(productsWithStock)
+      
+      // Initialize selected variants (default to first available variant for each product)
+      const initialSelection: {[key: string]: string} = {}
+      productsWithStock.forEach(product => {
+        const availableVariant = product.product_variants.find((v: ProductVariant) => v.stock_quantity > 0)
+        if (availableVariant) {
+          initialSelection[product.id] = availableVariant.id
+        }
+      })
+      setSelectedVariants(initialSelection)
+      
     } catch (error) {
       console.error('Error fetching products:', error)
     } finally {
@@ -48,32 +105,99 @@ export default function HomePage() {
     }
   }
 
+  const fetchSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('settings')
+        .select('*')
+
+      if (error) throw error
+
+      const settingsObj = data.reduce((acc: any, setting: any) => {
+        acc[setting.key] = setting.value
+        return acc
+      }, {})
+
+      setSettings(settingsObj)
+    } catch (error) {
+      console.error('Error fetching settings:', error)
+    }
+  }
+
+  const getSelectedVariant = (product: Product): ProductVariant | null => {
+    const selectedVariantId = selectedVariants[product.id]
+    return product.product_variants.find(v => v.id === selectedVariantId) || null
+  }
+
+  const getEffectivePrice = (variant: ProductVariant, quantity: number): { price: number; isBulkPrice: boolean } => {
+    const isBulkEligible = customerType === 'reseller' && 
+                          variant.bulk_price && 
+                          quantity >= variant.bulk_min_quantity &&
+                          settings.bulk_discount_enabled === 'true'
+    
+    return {
+      price: isBulkEligible ? variant.bulk_price! : variant.regular_price,
+      isBulkPrice: !!isBulkEligible
+    }
+  }
+
   const addToCart = (product: Product) => {
+    const selectedVariant = getSelectedVariant(product)
+    if (!selectedVariant) return
+
+    const { price, isBulkPrice } = getEffectivePrice(selectedVariant, 1)
+
     setCart(prev => {
-      const existing = prev.find(item => item.id === product.id)
+      const existing = prev.find(item => item.variantId === selectedVariant.id)
       if (existing) {
+        const newQuantity = existing.quantity + 1
+        const { price: newPrice, isBulkPrice: newIsBulkPrice } = getEffectivePrice(selectedVariant, newQuantity)
+        
         return prev.map(item =>
-          item.id === product.id
-            ? { ...item, quantity: item.quantity + 1 }
+          item.variantId === selectedVariant.id
+            ? { ...item, quantity: newQuantity, price: newPrice, isBulkPrice: newIsBulkPrice }
             : item
         )
       }
-      return [...prev, { ...product, quantity: 1 }]
+      
+      return [...prev, {
+        variantId: selectedVariant.id,
+        productId: product.id,
+        name: product.name,
+        size: selectedVariant.size_ml,
+        price,
+        quantity: 1,
+        isBulkPrice,
+        image_url: product.image_url
+      }]
     })
   }
 
-  const updateQuantity = (id: string, change: number) => {
+  const updateQuantity = (variantId: string, change: number) => {
     setCart(prev => {
       return prev.map(item => {
-        if (item.id === id) {
+        if (item.variantId === variantId) {
           const newQuantity = item.quantity + change
-          return newQuantity <= 0
-            ? null
-            : { ...item, quantity: newQuantity }
+          if (newQuantity <= 0) return null
+          
+          // Find the variant to recalculate pricing
+          const product = products.find(p => p.id === item.productId)
+          const variant = product?.product_variants.find(v => v.id === variantId)
+          
+          if (variant) {
+            const { price, isBulkPrice } = getEffectivePrice(variant, newQuantity)
+            return { ...item, quantity: newQuantity, price, isBulkPrice }
+          }
+          
+          return { ...item, quantity: newQuantity }
         }
         return item
       }).filter(Boolean) as CartItem[]
     })
+  }
+
+  const removeFromCart = (variantId: string) => {
+    setCart(prev => prev.filter(item => item.variantId !== variantId))
   }
 
   const toggleFavorite = (productId: string) => {
@@ -84,11 +208,21 @@ export default function HomePage() {
     )
   }
 
-  const getTotalPrice = () => {
+  const getSubtotal = () => {
     return cart.reduce((total, item) => total + (item.price * item.quantity), 0)
   }
 
+  const getDeliveryCost = () => {
+    return includeDelivery ? parseFloat(settings.delivery_cost || '0') : 0
+  }
+
+  const getTotalPrice = () => {
+    return getSubtotal() + getDeliveryCost()
+  }
+
   const handleCheckout = async () => {
+    if (cart.length === 0) return
+
     try {
       setLoading(true)
       
@@ -97,11 +231,15 @@ export default function HomePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           items: cart.map(item => ({
-            id: item.id,
+            variantId: item.variantId,
             name: item.name,
+            size: item.size,
             price: item.price,
-            quantity: item.quantity
-          }))
+            quantity: item.quantity,
+            isBulkPrice: item.isBulkPrice
+          })),
+          includeDelivery,
+          customerType
         })
       })
 
@@ -155,17 +293,34 @@ export default function HomePage() {
               </h1>
             </div>
 
-            <button
-              onClick={() => setIsCartOpen(true)}
-              className="relative p-3 text-gray-700 hover:text-rose-600 transition-all duration-300 hover:bg-rose-50 rounded-full"
-            >
-              <ShoppingBag className="h-7 w-7" />
-              {cart.length > 0 && (
-                <span className="absolute -top-1 -right-1 bg-gradient-to-r from-rose-500 to-amber-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-medium animate-pulse">
-                  {cart.reduce((sum, item) => sum + item.quantity, 0)}
-                </span>
-              )}
-            </button>
+            <div className="flex items-center space-x-4">
+              {/* Customer Type Toggle */}
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-gray-600">Customer Type:</span>
+                <button
+                  onClick={() => setCustomerType(customerType === 'regular' ? 'reseller' : 'regular')}
+                  className={`px-3 py-1 rounded-full text-sm transition-all duration-300 ${
+                    customerType === 'reseller'
+                      ? 'bg-gradient-to-r from-rose-500 to-amber-500 text-white'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  {customerType === 'reseller' ? 'Reseller' : 'Regular'}
+                </button>
+              </div>
+
+              <button
+                onClick={() => setIsCartOpen(true)}
+                className="relative p-3 text-gray-700 hover:text-rose-600 transition-all duration-300 hover:bg-rose-50 rounded-full"
+              >
+                <ShoppingBag className="h-7 w-7" />
+                {cart.length > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-gradient-to-r from-rose-500 to-amber-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-medium animate-pulse">
+                    {cart.reduce((sum, item) => sum + item.quantity, 0)}
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -187,9 +342,16 @@ export default function HomePage() {
               </span>
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-12 leading-relaxed">
-              Discover our curated collection of premium perfumes, crafted for those who appreciate the art of scent. 
+              Discover our curated collection of premium perfumes, available in 35ml, 50ml, and 100ml bottles. 
               Each fragrance tells a unique story of elegance and sophistication.
             </p>
+            {customerType === 'reseller' && settings.bulk_discount_enabled === 'true' && (
+              <div className="bg-gradient-to-r from-rose-100 to-amber-100 border border-rose-200 rounded-lg p-4 max-w-2xl mx-auto">
+                <p className="text-rose-700 font-medium">
+                  🎉 Reseller pricing active! Enjoy bulk discounts on qualifying quantities.
+                </p>
+              </div>
+            )}
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto mb-16">
@@ -197,22 +359,22 @@ export default function HomePage() {
               <div className="w-12 h-12 bg-gradient-to-br from-rose-500 to-amber-500 rounded-full mx-auto mb-4 flex items-center justify-center">
                 <Heart className="h-6 w-6 text-white" />
               </div>
-              <h3 className="font-semibold text-gray-800 mb-2">Premium Quality</h3>
-              <p className="text-gray-600 text-sm">Handcrafted with the finest ingredients</p>
+              <h3 className="font-semibold text-gray-800 mb-2">Multiple Sizes</h3>
+              <p className="text-gray-600 text-sm">Available in 35ml, 50ml, and 100ml bottles</p>
             </div>
             <div className="text-center p-6 bg-white/60 backdrop-blur-sm rounded-2xl border border-rose-100/50">
               <div className="w-12 h-12 bg-gradient-to-br from-rose-500 to-amber-500 rounded-full mx-auto mb-4 flex items-center justify-center">
                 <Star className="h-6 w-6 text-white" />
               </div>
-              <h3 className="font-semibold text-gray-800 mb-2">Exclusive Collection</h3>
-              <p className="text-gray-600 text-sm">Unique scents you won&apos;t find elsewhere</p>
+              <h3 className="font-semibold text-gray-800 mb-2">Bulk Discounts</h3>
+              <p className="text-gray-600 text-sm">Special pricing for resellers and bulk orders</p>
             </div>
             <div className="text-center p-6 bg-white/60 backdrop-blur-sm rounded-2xl border border-rose-100/50">
               <div className="w-12 h-12 bg-gradient-to-br from-rose-500 to-amber-500 rounded-full mx-auto mb-4 flex items-center justify-center">
                 <ShoppingBag className="h-6 w-6 text-white" />
               </div>
               <h3 className="font-semibold text-gray-800 mb-2">Fast Delivery</h3>
-              <p className="text-gray-600 text-sm">Quick and secure shipping worldwide</p>
+              <p className="text-gray-600 text-sm">Optional delivery service available</p>
             </div>
           </div>
         </div>
@@ -227,60 +389,134 @@ export default function HomePage() {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
-            {products.map((product) => (
-              <div
-                key={product.id}
-                className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-500 overflow-hidden group border border-rose-100/50 hover:border-rose-200/50"
-              >
-                <div className="relative aspect-square overflow-hidden">
-                  <Image
-                    src={product.image_url}
-                    alt={product.name}
-                    width={400}
-                    height={400}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                  />
-                  <button
-                    onClick={() => toggleFavorite(product.id)}
-                    className="absolute top-4 right-4 p-2 bg-white/80 backdrop-blur-sm rounded-full hover:bg-white transition-all duration-300"
-                  >
-                    <Heart 
-                      className={`h-5 w-5 transition-colors ${
-                        favorites.includes(product.id) 
-                          ? 'text-rose-500 fill-current' 
-                          : 'text-gray-400 hover:text-rose-500'
-                      }`} 
+            {products.map((product) => {
+              const selectedVariant = getSelectedVariant(product)
+              const effectivePrice = selectedVariant ? getEffectivePrice(selectedVariant, 1) : null
+              
+              return (
+                <div
+                  key={product.id}
+                  className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-500 overflow-hidden group border border-rose-100/50 hover:border-rose-200/50"
+                >
+                  <div className="relative aspect-square overflow-hidden">
+                    <Image
+                      src={product.image_url}
+                      alt={product.name}
+                      width={400}
+                      height={400}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                     />
-                  </button>
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                </div>
-                
-                <div className="p-8">
-                  <h3 className="text-2xl font-light text-gray-800 mb-3">
-                    {product.name}
-                  </h3>
-                  <p className="text-gray-600 mb-6 text-sm leading-relaxed line-clamp-2">
-                    {product.description}
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-3xl font-light text-rose-600">
-                        R{product.price.toFixed(2)}
-                      </span>
-                      <div className="text-xs text-gray-500 mt-1">
-                        {product.stock_quantity} in stock
+                    <button
+                      onClick={() => toggleFavorite(product.id)}
+                      className="absolute top-4 right-4 p-2 bg-white/80 backdrop-blur-sm rounded-full hover:bg-white transition-all duration-300"
+                    >
+                      <Heart 
+                        className={`h-5 w-5 transition-colors ${
+                          favorites.includes(product.id) 
+                            ? 'text-rose-500 fill-current' 
+                            : 'text-gray-400 hover:text-rose-500'
+                        }`} 
+                      />
+                    </button>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  </div>
+                  
+                  <div className="p-8">
+                    <h3 className="text-2xl font-light text-gray-800 mb-3">
+                      {product.name}
+                    </h3>
+                    <p className="text-gray-600 mb-6 text-sm leading-relaxed line-clamp-2">
+                      {product.description}
+                    </p>
+                    
+                    {/* Size Selection */}
+                    <div className="mb-6">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Select Size:
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {product.product_variants
+                          .sort((a, b) => a.size_ml - b.size_ml)
+                          .map((variant) => (
+                          <button
+                            key={variant.id}
+                            onClick={() => setSelectedVariants(prev => ({
+                              ...prev,
+                              [product.id]: variant.id
+                            }))}
+                            disabled={variant.stock_quantity === 0}
+                            className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
+                              selectedVariants[product.id] === variant.id
+                                ? 'bg-gradient-to-r from-rose-500 to-amber-500 text-white shadow-lg'
+                                : variant.stock_quantity > 0
+                                  ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                  : 'bg-gray-50 text-gray-400 cursor-not-allowed'
+                            }`}
+                          >
+                            {variant.size_ml}ml
+                            {variant.stock_quantity === 0 && ' (Out of Stock)'}
+                          </button>
+                        ))}
                       </div>
                     </div>
+
+                    {/* Pricing and Stock Info */}
+                    {selectedVariant && effectivePrice && (
+                      <div className="mb-6">
+                        <div className="flex items-center justify-between mb-2">
+                          <div>
+                            <span className="text-3xl font-light text-rose-600">
+                              R{effectivePrice.price.toFixed(2)}
+                            </span>
+                            {effectivePrice.isBulkPrice && (
+                              <span className="ml-2 px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full">
+                                Bulk Price
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {/* Show regular price if bulk price is active */}
+                        {effectivePrice.isBulkPrice && (
+                          <div className="text-sm text-gray-500 line-through">
+                            Regular: R{selectedVariant.regular_price.toFixed(2)}
+                          </div>
+                        )}
+                        
+                        {/* Show bulk pricing info for resellers */}
+                        {customerType === 'reseller' && selectedVariant.bulk_price && !effectivePrice.isBulkPrice && (
+                          <div className="text-sm text-green-600 mt-1">
+                            Bulk price: R{selectedVariant.bulk_price.toFixed(2)} (min {selectedVariant.bulk_min_quantity} items)
+                          </div>
+                        )}
+                        
+                        <div className="flex items-center justify-between mt-2">
+                          <div className="text-xs text-gray-500">
+                            {selectedVariant.stock_quantity} in stock
+                          </div>
+                          {selectedVariant.stock_quantity <= 5 && selectedVariant.stock_quantity > 0 && (
+                            <div className="text-xs text-orange-600 font-medium">
+                              Only {selectedVariant.stock_quantity} left
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                     <button
                       onClick={() => addToCart(product)}
-                      className="bg-gradient-to-r from-rose-500 to-amber-500 text-white px-8 py-3 rounded-full hover:from-rose-600 hover:to-amber-600 transition-all duration-300 font-medium shadow-lg hover:shadow-xl transform hover:-translate-y-1"
+                      disabled={!selectedVariant || selectedVariant.stock_quantity === 0}
+                      className="w-full bg-gradient-to-r from-rose-500 to-amber-500 text-white px-8 py-3 rounded-full hover:from-rose-600 hover:to-amber-600 transition-all duration-300 font-medium shadow-lg hover:shadow-xl transform hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                     >
-                      Add to Cart
+                      {!selectedVariant || selectedVariant.stock_quantity === 0 
+                        ? 'Out of Stock' 
+                        : 'Add to Cart'
+                      }
                     </button>
                   </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       </section>
@@ -336,7 +572,7 @@ export default function HomePage() {
                 </div>
                 <div className="flex items-center">
                   <Phone className="h-5 w-5 mr-3 text-rose-400" />
-                  <span className="text-sm">+27 123 456 789</span>
+                  <span className="text-sm">+263 778 886 413</span>
                 </div>
                 <div className="flex items-center">
                   <Mail className="h-5 w-5 mr-3 text-rose-400" />
@@ -361,6 +597,35 @@ export default function HomePage() {
         </div>
       </footer>
 
+      {/* Floating Action Buttons */}
+      <div className="fixed bottom-6 right-6 flex flex-col space-y-4 z-50">
+        {/* WhatsApp Button */}
+        <a
+          href={whatsappUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="group relative w-14 h-14 bg-green-500 hover:bg-green-600 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center transform hover:scale-110"
+        >
+          <MessageCircle className="h-7 w-7 text-white" />
+          <div className="absolute right-16 top-1/2 transform -translate-y-1/2 bg-gray-800 text-white px-3 py-2 rounded-lg text-sm whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
+            Chat on WhatsApp
+            <div className="absolute left-full top-1/2 transform -translate-y-1/2 border-4 border-transparent border-l-gray-800"></div>
+          </div>
+        </a>
+
+        {/* Call Button */}
+        <a
+          href={callUrl}
+          className="group relative w-14 h-14 bg-blue-500 hover:bg-blue-600 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center transform hover:scale-110"
+        >
+          <Phone className="h-7 w-7 text-white" />
+          <div className="absolute right-16 top-1/2 transform -translate-y-1/2 bg-gray-800 text-white px-3 py-2 rounded-lg text-sm whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
+            Call us now
+            <div className="absolute left-full top-1/2 transform -translate-y-1/2 border-4 border-transparent border-l-gray-800"></div>
+          </div>
+        </a>
+      </div>
+
       {/* Cart Sidebar */}
       {isCartOpen && (
         <div className="fixed inset-0 z-50 overflow-hidden">
@@ -373,7 +638,7 @@ export default function HomePage() {
               </p>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6" style={{ height: 'calc(100vh - 200px)' }}>
+            <div className="flex-1 overflow-y-auto p-6" style={{ height: 'calc(100vh - 280px)' }}>
               {cart.length === 0 ? (
                 <div className="text-center py-12">
                   <ShoppingBag className="h-16 w-16 text-gray-300 mx-auto mb-4" />
@@ -383,7 +648,7 @@ export default function HomePage() {
               ) : (
                 <div className="space-y-6">
                   {cart.map((item) => (
-                    <div key={item.id} className="flex items-center space-x-4 p-4 bg-gray-50 rounded-xl">
+                    <div key={item.variantId} className="flex items-center space-x-4 p-4 bg-gray-50 rounded-xl">
                       <Image
                         src={item.image_url}
                         alt={item.name}
@@ -393,18 +658,26 @@ export default function HomePage() {
                       />
                       <div className="flex-1">
                         <h4 className="font-medium text-gray-800">{item.name}</h4>
-                        <p className="text-rose-600 font-semibold">R{item.price.toFixed(2)}</p>
+                        <div className="text-sm text-gray-500">{item.size}ml</div>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-rose-600 font-semibold">R{item.price.toFixed(2)}</span>
+                          {item.isBulkPrice && (
+                            <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full">
+                              Bulk
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <div className="flex items-center space-x-3">
                         <button
-                          onClick={() => updateQuantity(item.id, -1)}
+                          onClick={() => updateQuantity(item.variantId, -1)}
                           className="p-1 hover:bg-gray-200 rounded-full transition-colors"
                         >
                           <Minus className="h-4 w-4" />
                         </button>
                         <span className="w-8 text-center font-medium">{item.quantity}</span>
                         <button
-                          onClick={() => updateQuantity(item.id, 1)}
+                          onClick={() => updateQuantity(item.variantId, 1)}
                           className="p-1 hover:bg-gray-200 rounded-full transition-colors"
                         >
                           <Plus className="h-4 w-4" />
@@ -418,12 +691,43 @@ export default function HomePage() {
 
             {cart.length > 0 && (
               <div className="border-t p-6 bg-gradient-to-r from-rose-50 to-amber-50">
-                <div className="flex justify-between items-center mb-6">
-                  <span className="text-lg font-semibold text-gray-800">Total:</span>
-                  <span className="text-3xl font-bold bg-gradient-to-r from-rose-600 to-amber-600 bg-clip-text text-transparent">
-                    R{getTotalPrice().toFixed(2)}
-                  </span>
+                {/* Delivery Option */}
+                <div className="mb-4">
+                  <label className="flex items-center space-x-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={includeDelivery}
+                      onChange={(e) => setIncludeDelivery(e.target.checked)}
+                      className="w-4 h-4 text-rose-600 rounded focus:ring-rose-500"
+                    />
+                    <span className="text-sm text-gray-700">
+                      Include delivery (R{parseFloat(settings.delivery_cost || '0').toFixed(2)})
+                    </span>
+                  </label>
                 </div>
+
+                {/* Price Breakdown */}
+                <div className="space-y-2 mb-6">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-600">Subtotal:</span>
+                    <span className="font-medium">R{getSubtotal().toFixed(2)}</span>
+                  </div>
+                  {includeDelivery && (
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-gray-600">Delivery:</span>
+                      <span className="font-medium">R{getDeliveryCost().toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="border-t pt-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-lg font-semibold text-gray-800">Total:</span>
+                      <span className="text-3xl font-bold bg-gradient-to-r from-rose-600 to-amber-600 bg-clip-text text-transparent">
+                        R{getTotalPrice().toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
                 <button
                   onClick={handleCheckout}
                   disabled={loading}

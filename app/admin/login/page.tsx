@@ -31,7 +31,7 @@ export default function LoginPage() {
                 const { data: { user } } = await supabase.auth.getUser()
 
                 if (user && adminEmails.includes(user.email || '')) {
-                    router.push('/admin') // Redirect to admin panel on successful admin login
+                    router.push('/admin') // Redirect to admin page
                 } else {
                     setError('You are not authorized to access the admin panel.')
                     await supabase.auth.signOut() // Sign out non-admin users
