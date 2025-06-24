@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, Edit, Trash2, Save, X, LogOut, User, Package, DollarSign, TrendingUp } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import type { User as SupabaseUser } from '@supabase/supabase-js'
 import Link from 'next/link' 
 import Image from 'next/image'
 
@@ -28,7 +29,7 @@ export default function AdminPanel() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [isAddingNew, setIsAddingNew] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<SupabaseUser | null>(null)
   const [stats, setStats] = useState<AdminStats>({
     totalProducts: 0,
     totalValue: 0,
@@ -45,20 +46,47 @@ export default function AdminPanel() {
     stock_quantity: 0
   }
 
-  useEffect(() => {
-    checkAuth()
+  const calculateStats = useCallback((products: Product[]) => {
+    const totalProducts = products.length
+    const totalValue = products.reduce((sum, product) => sum + (product.price * product.stock_quantity), 0)
+    const lowStockItems = products.filter(product => product.stock_quantity < 5).length
+    const recentOrders = 0 // This would need to be fetched from an orders table
+
+    setStats({
+      totalProducts,
+      totalValue,
+      lowStockItems,
+      recentOrders
+    })
   }, [])
 
-  const checkAuth = async () => {
+  const fetchProducts = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      const productsData = data || []
+      setProducts(productsData)
+      calculateStats(productsData)
+    } catch (error) {
+      console.error('Error fetching products:', error)
+    } finally {
+      setLoading(false)
+    }
+  }, [calculateStats])
+
+  const checkAuth = useCallback(async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      
+
       if (!session) {
         router.push('/admin/login')
         return
       }
 
-      // Check if user is admin
       const adminEmails = ['admin@aromaticscents.co.za', 'info@aromaticscents.co.za']
       if (!adminEmails.includes(session.user.email || '')) {
         await supabase.auth.signOut()
@@ -72,36 +100,11 @@ export default function AdminPanel() {
       console.error('Auth check failed:', error)
       router.push('/admin/login')
     }
-  }
+  }, [router, fetchProducts])
 
-  const fetchProducts = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .order('created_at', { ascending: false })
-      
-      if (error) throw error
-      
-      const products = data || []
-      setProducts(products)
-      
-      // Calculate stats
-      const totalValue = products.reduce((sum, p) => sum + (p.price * p.stock_quantity), 0)
-      const lowStockItems = products.filter(p => p.stock_quantity < 5).length
-      
-      setStats({
-        totalProducts: products.length,
-        totalValue,
-        lowStockItems,
-        recentOrders: 0 // You can implement this based on your orders table
-      })
-    } catch (error) {
-      console.error('Error fetching products:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  useEffect(() => {
+    checkAuth()
+  }, [checkAuth])
 
   const handleSignOut = async () => {
     try {

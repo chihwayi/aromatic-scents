@@ -205,7 +205,7 @@ export default function HomePage() {
                 <Star className="h-6 w-6 text-white" />
               </div>
               <h3 className="font-semibold text-gray-800 mb-2">Exclusive Collection</h3>
-              <p className="text-gray-600 text-sm">Unique scents you won't find elsewhere</p>
+              <p className="text-gray-600 text-sm">Unique scents you won&apos;t find elsewhere</p>
             </div>
             <div className="text-center p-6 bg-white/60 backdrop-blur-sm rounded-2xl border border-rose-100/50">
               <div className="w-12 h-12 bg-gradient-to-br from-rose-500 to-amber-500 rounded-full mx-auto mb-4 flex items-center justify-center">
@@ -298,7 +298,7 @@ export default function HomePage() {
                 <h3 className="text-3xl font-light">Aromatic Scents</h3>
               </div>
               <p className="text-gray-300 mb-8 leading-relaxed max-w-md">
-                Where passion meets perfection. We curate the world's finest fragrances to bring you an unparalleled 
+                Where passion meets perfection. We curate the world&apos;s finest fragrances to bring you an unparalleled 
                 olfactory experience that defines your unique style and personality.
               </p>
               <div className="flex space-x-4">
