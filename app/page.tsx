@@ -570,7 +570,7 @@ export default function HomePage() {
                 </div>
                 <div className="flex items-center">
                   <Phone className="h-5 w-5 mr-3 text-rose-400" />
-                  <span className="text-sm">+263 778 886 413</span>
+                  <span className="text-sm">+27 849 615 725</span>
                 </div>
                 <div className="flex items-center">
                   <Mail className="h-5 w-5 mr-3 text-rose-400" />
