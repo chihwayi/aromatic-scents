@@ -229,58 +229,12 @@ export default function AdminPanel() {
     }
   }
 
-  // Custom image component to handle external URLs
-  const ProductImage = ({ src, alt, className }: { src: string, alt: string, className: string }) => {
-    const [imgSrc, setImgSrc] = useState(src || 'https://via.placeholder.com/100')
-    const [hasError, setHasError] = useState(false)
-
-    const handleError = () => {
-      if (!hasError) {
-        setHasError(true)
-        setImgSrc('https://via.placeholder.com/100')
-      }
-    }
-
-    // For external images, use regular img tag with proper error handling
-    if (src && (src.startsWith('http') || src.startsWith('https'))) {
-      return (
-        <img
-          src={imgSrc}
-          alt={alt}
-          className={className}
-          onError={handleError}
-          crossOrigin="anonymous"
-          style={{ objectFit: 'cover' }}
-        />
-      )
-    }
-
-    // For relative URLs or known domains, use Next.js Image
-    return (
-      <Image
-        src={imgSrc}
-        alt={alt}
-        width={96}
-        height={96}
-        className={className}
-        onError={handleError}
-        style={{ objectFit: 'cover' }}
-      />
-    )
-  }
-
   const ProductForm = ({ product, onSave, onCancel }: {
     product: Product
     onSave: (product: Product) => void
     onCancel: () => void
   }) => {
     const [formData, setFormData] = useState(product)
-    const [imagePreview, setImagePreview] = useState(product.image_url)
-
-    const handleImageUrlChange = (url: string) => {
-      setFormData({ ...formData, image_url: url })
-      setImagePreview(url)
-    }
 
     const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault()
@@ -339,22 +293,10 @@ export default function AdminPanel() {
           <input
             type="url"
             value={formData.image_url}
-            onChange={(e) => handleImageUrlChange(e.target.value)}
+            onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
             className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all duration-300"
             placeholder="https://example.com/image.jpg"
           />
-          {imagePreview && (
-            <div className="mt-3">
-              <p className="text-sm text-gray-600 mb-2">Preview:</p>
-              <div className="w-32 h-32 border border-gray-300 rounded-xl overflow-hidden">
-                <ProductImage
-                  src={imagePreview}
-                  alt="Preview"
-                  className="w-full h-full object-cover"
-                />
-              </div>
-            </div>
-          )}
         </div>
 
         <div>
@@ -652,13 +594,16 @@ export default function AdminPanel() {
               {products.map((product) => (
                 <div key={product.id} className="p-8 hover:bg-gray-50/50 transition-colors duration-300">
                   <div className="flex items-start space-x-6">
-                    <div className="w-24 h-24 rounded-xl shadow-md overflow-hidden bg-gray-100">
-                      <ProductImage
-                        src={product.image_url}
-                        alt={product.name}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
+                    <Image
+                      src={product.image_url || 'https://via.placeholder.com/100'}
+                      alt={product.name}
+                      width={400}
+                      height={400}
+                      className="w-24 h-24 object-cover rounded-xl shadow-md"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = 'https://via.placeholder.com/100'
+                      }}
+                    />
                     
                     <div className="flex-1">
                       <h3 className="text-xl font-semibold text-gray-900 mb-2">{product.name}</h3>
