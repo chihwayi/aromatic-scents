@@ -14,6 +14,7 @@ interface Product {
   name: string
   description: string
   image_url: string
+  is_new_arrival?: boolean
 }
 
 interface CreateProductRequest {
@@ -66,7 +67,8 @@ export async function POST(request: NextRequest) {
       .insert([{
         name: product.name,
         description: product.description,
-        image_url: product.image_url
+        image_url: product.image_url,
+        is_new_arrival: product.is_new_arrival || false
       }])
       .select()
 
@@ -132,6 +134,7 @@ export async function PUT(request: NextRequest) {
         name: product.name,
         description: product.description,
         image_url: product.image_url,
+        is_new_arrival: product.is_new_arrival || false,
         updated_at: new Date().toISOString()
       })
       .eq('id', id)

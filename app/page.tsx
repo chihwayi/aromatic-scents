@@ -22,6 +22,7 @@ interface Product {
   name: string
   description: string
   image_url: string
+  is_new_arrival?: boolean
   product_variants: ProductVariant[]
 }
 
@@ -48,6 +49,7 @@ interface SettingRow {
 
 export default function HomePage() {
   const [products, setProducts] = useState<Product[]>([])
+  const [newArrivals, setNewArrivals] = useState<Product[]>([])
   const [cart, setCart] = useState<CartItem[]>([])
   const [isCartOpen, setIsCartOpen] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -91,7 +93,12 @@ export default function HomePage() {
         product.product_variants.some((variant: ProductVariant) => variant.stock_quantity > 0)
       )
 
-      setProducts(productsWithStock)
+      // Separate new arrivals from regular products
+      const newArrivalsWithStock = productsWithStock.filter(product => product.is_new_arrival)
+      const regularProducts = productsWithStock.filter(product => !product.is_new_arrival)
+
+      setNewArrivals(newArrivalsWithStock)
+      setProducts(regularProducts)
 
       // Initialize selected variants (default to first available variant for each product)
       const initialSelection: { [key: string]: string } = {}
@@ -379,6 +386,158 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* New Arrivals Section */}
+      {newArrivals.length > 0 && (
+        <section className="py-20 bg-gradient-to-r from-rose-100/30 to-amber-100/30">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-16">
+              <div className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-rose-500 to-amber-500 text-white rounded-full text-sm font-medium mb-4">
+                ✨ New Arrivals
+              </div>
+              <h3 className="text-4xl font-light text-gray-800 mb-4">Latest Fragrances</h3>
+              <p className="text-gray-600 max-w-2xl mx-auto mb-8">
+                Discover our newest additions to the collection - fresh scents that capture the essence of modern elegance.
+              </p>
+              <div className="w-24 h-1 bg-gradient-to-r from-rose-500 to-amber-500 mx-auto rounded-full"></div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+              {newArrivals.map((product) => {
+                const selectedVariant = getSelectedVariant(product)
+                const effectivePrice = selectedVariant ? getEffectivePrice(selectedVariant, 1) : null
+
+                return (
+                  <div
+                    key={product.id}
+                    className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-500 overflow-hidden group border-2 border-rose-200/50 hover:border-rose-300/50 relative"
+                  >
+                    {/* New Badge */}
+                    <div className="absolute top-4 left-4 z-10 bg-gradient-to-r from-rose-500 to-amber-500 text-white px-3 py-1 rounded-full text-xs font-medium">
+                      NEW
+                    </div>
+                    
+                    <div className="relative aspect-square overflow-hidden">
+                      <Image
+                        src={product.image_url}
+                        alt={product.name}
+                        width={400}
+                        height={400}
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                      />
+                      <button
+                        onClick={() => toggleFavorite(product.id)}
+                        className="absolute top-4 right-4 p-2 bg-white/80 backdrop-blur-sm rounded-full hover:bg-white transition-all duration-300"
+                      >
+                        <Heart
+                          className={`h-5 w-5 transition-colors ${favorites.includes(product.id)
+                            ? 'text-rose-500 fill-current'
+                            : 'text-gray-400 hover:text-rose-500'
+                            }`}
+                        />
+                      </button>
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                    </div>
+
+                    <div className="p-8">
+                      <h3 className="text-2xl font-light text-gray-800 mb-3">
+                        {product.name}
+                      </h3>
+                      <p className="text-gray-600 mb-6 text-sm leading-relaxed line-clamp-2">
+                        {product.description}
+                      </p>
+
+                      {/* Size Selection */}
+                      <div className="mb-6">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Select Size:
+                        </label>
+                        <div className="flex flex-wrap gap-2">
+                          {product.product_variants
+                            .sort((a, b) => a.size_ml - b.size_ml)
+                            .map((variant) => (
+                              <button
+                                key={variant.id}
+                                onClick={() => setSelectedVariants(prev => ({
+                                  ...prev,
+                                  [product.id]: variant.id
+                                }))}
+                                disabled={variant.stock_quantity === 0}
+                                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${selectedVariants[product.id] === variant.id
+                                  ? 'bg-gradient-to-r from-rose-500 to-amber-500 text-white shadow-lg'
+                                  : variant.stock_quantity > 0
+                                    ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                    : 'bg-gray-50 text-gray-400 cursor-not-allowed'
+                                  }`}
+                              >
+                                {variant.size_ml}ml
+                                {variant.stock_quantity === 0 && ' (Out of Stock)'}
+                              </button>
+                            ))}
+                        </div>
+                      </div>
+
+                      {/* Pricing and Stock Info */}
+                      {selectedVariant && effectivePrice && (
+                        <div className="mb-6">
+                          <div className="flex items-center justify-between mb-2">
+                            <div>
+                              <span className="text-3xl font-light text-rose-600">
+                                R{effectivePrice.price.toFixed(2)}
+                              </span>
+                              {effectivePrice.isBulkPrice && (
+                                <span className="ml-2 px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full">
+                                  Bulk Price
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Show regular price if bulk price is active */}
+                          {effectivePrice.isBulkPrice && (
+                            <div className="text-sm text-gray-500 line-through">
+                              Regular: R{selectedVariant.regular_price.toFixed(2)}
+                            </div>
+                          )}
+
+                          {/* Show bulk pricing info for resellers */}
+                          {customerType === 'reseller' && selectedVariant.bulk_price && !effectivePrice.isBulkPrice && (
+                            <div className="text-sm text-green-600 mt-1">
+                              Bulk price: R{selectedVariant.bulk_price.toFixed(2)} (min {selectedVariant.bulk_min_quantity} items)
+                            </div>
+                          )}
+
+                          <div className="flex items-center justify-between mt-2">
+                            <div className="text-xs text-gray-500">
+                              {selectedVariant.stock_quantity} in stock
+                            </div>
+                            {selectedVariant.stock_quantity <= 5 && selectedVariant.stock_quantity > 0 && (
+                              <div className="text-xs text-orange-600 font-medium">
+                                Only {selectedVariant.stock_quantity} left
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      <button
+                        onClick={() => addToCart(product)}
+                        disabled={!selectedVariant || selectedVariant.stock_quantity === 0}
+                        className="w-full bg-gradient-to-r from-rose-500 to-amber-500 text-white px-8 py-3 rounded-full hover:from-rose-600 hover:to-amber-600 transition-all duration-300 font-medium shadow-lg hover:shadow-xl transform hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                      >
+                        {!selectedVariant || selectedVariant.stock_quantity === 0
+                          ? 'Out of Stock'
+                          : 'Add to Cart'
+                        }
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Products Grid */}
       <section className="py-20">

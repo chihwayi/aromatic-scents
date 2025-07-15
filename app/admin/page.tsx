@@ -22,6 +22,7 @@ interface Product {
   name: string
   description: string
   image_url: string
+  is_new_arrival?: boolean
   product_variants?: ProductVariant[]
 }
 
@@ -62,6 +63,7 @@ export default function AdminPanel() {
     name: '',
     description: '',
     image_url: '',
+    is_new_arrival: false,
     product_variants: [
       { size_ml: 35, regular_price: 0, bulk_price: 0, bulk_min_quantity: 6, stock_quantity: 0 },
       { size_ml: 50, regular_price: 0, bulk_price: 0, bulk_min_quantity: 6, stock_quantity: 0 },
@@ -168,8 +170,8 @@ export default function AdminPanel() {
     try {
       const method = product.id ? 'PUT' : 'POST'
       const body = product.id 
-        ? { id: product.id, product: { name: product.name, description: product.description, image_url: product.image_url }, variants: product.product_variants }
-        : { product: { name: product.name, description: product.description, image_url: product.image_url }, variants: product.product_variants }
+        ? { id: product.id, product: { name: product.name, description: product.description, image_url: product.image_url, is_new_arrival: product.is_new_arrival }, variants: product.product_variants }
+        : { product: { name: product.name, description: product.description, image_url: product.image_url, is_new_arrival: product.is_new_arrival }, variants: product.product_variants }
 
       const response = await fetch('/api/products', {
         method,
@@ -297,6 +299,23 @@ export default function AdminPanel() {
             className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all duration-300"
             placeholder="https://example.com/image.jpg"
           />
+        </div>
+
+        <div>
+          <label className="flex items-center space-x-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={formData.is_new_arrival || false}
+              onChange={(e) => setFormData({ ...formData, is_new_arrival: e.target.checked })}
+              className="w-4 h-4 text-rose-600 rounded focus:ring-rose-500"
+            />
+            <span className="text-sm font-medium text-gray-700">
+              Mark as New Arrival
+            </span>
+          </label>
+          <p className="text-xs text-gray-500 mt-1 ml-7">
+            New arrivals will be displayed in a special section on the homepage
+          </p>
         </div>
 
         <div>
@@ -550,6 +569,26 @@ export default function AdminPanel() {
               <Plus className="h-5 w-5 mr-2" />
               Add New Product
             </button>
+            {/* Migration button - commented out after successful migration */}
+            {/* <button
+              onClick={async () => {
+                try {
+                  const response = await fetch('/api/migrate', { method: 'POST' })
+                  const result = await response.json()
+                  if (result.success) {
+                    alert(`Migration successful! Updated ${result.updatedProducts} products.`)
+                    fetchProducts()
+                  } else {
+                    alert('Migration failed: ' + result.error)
+                  }
+                } catch (error) {
+                  alert('Migration failed: ' + error)
+                }
+              }}
+              className="flex items-center px-6 py-4 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-all duration-300 shadow-lg hover:shadow-xl ml-4"
+            >
+              Run Migration
+            </button> */}
           </div>
         )}
 
@@ -606,7 +645,14 @@ export default function AdminPanel() {
                     />
                     
                     <div className="flex-1">
-                      <h3 className="text-xl font-semibold text-gray-900 mb-2">{product.name}</h3>
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="text-xl font-semibold text-gray-900">{product.name}</h3>
+                        {product.is_new_arrival && (
+                          <span className="px-2 py-1 bg-gradient-to-r from-rose-500 to-amber-500 text-white text-xs rounded-full font-medium">
+                            NEW
+                          </span>
+                        )}
+                      </div>
                       <p className="text-gray-600 text-sm mb-4 line-clamp-2">{product.description}</p>
                       
                       {/* Product Variants */}

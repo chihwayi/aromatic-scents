@@ -1,0 +1,168 @@
+-- Updated products table with bottle sizes and bulk pricing
+CREATE TABLE products (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  description TEXT,
+  image_url TEXT,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Product variants table for different bottle sizes
+CREATE TABLE product_variants (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  product_id UUID REFERENCES products(id) ON DELETE CASCADE,
+  size_ml INTEGER NOT NULL CHECK (size_ml IN (35, 50, 100)),
+  regular_price DECIMAL(10,2) NOT NULL,
+  bulk_price DECIMAL(10,2),
+  bulk_min_quantity INTEGER DEFAULT 1,
+  stock_quantity INTEGER DEFAULT 0,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Updated orders table
+CREATE TABLE orders (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  customer_email VARCHAR(255) NOT NULL,
+  customer_name VARCHAR(255) NOT NULL,
+  customer_type VARCHAR(20) DEFAULT 'regular' CHECK (customer_type IN ('regular', 'reseller')),
+  subtotal_amount DECIMAL(10,2) NOT NULL,
+  delivery_cost DECIMAL(10,2) DEFAULT 0,
+  total_amount DECIMAL(10,2) NOT NULL,
+  includes_delivery BOOLEAN DEFAULT false,
+  status VARCHAR(50) DEFAULT 'pending',
+  stripe_payment_intent_id VARCHAR(255),
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Updated order_items table
+CREATE TABLE order_items (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  order_id UUID REFERENCES orders(id) ON DELETE CASCADE,
+  product_variant_id UUID REFERENCES product_variants(id),
+  quantity INTEGER NOT NULL,
+  unit_price DECIMAL(10,2) NOT NULL,
+  is_bulk_price BOOLEAN DEFAULT false
+);
+
+-- Settings table for admin configurations
+CREATE TABLE settings (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  key VARCHAR(255) UNIQUE NOT NULL,
+  value TEXT NOT NULL,
+  description TEXT,
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Insert default settings
+INSERT INTO settings (key, value, description) VALUES
+('delivery_cost', '50.00', 'Standard delivery cost in ZAR'),
+('bulk_discount_enabled', 'true', 'Enable bulk pricing for resellers');
+
+-- Drop the old order_items foreign key if it exists and recreate
+-- ALTER TABLE order_items DROP CONSTRAINT IF EXISTS order_items_product_id_fkey;
+
+-- Insert sample products with variants
+INSERT INTO products (name, description, image_url) VALUES
+('Midnight Elegance', 'A sophisticated blend of bergamot, jasmine, and sandalwood', 'https://images.unsplash.com/photo-1541643600914-78b084683601?w=400'),
+('Ocean Breeze', 'Fresh aquatic notes with hints of sea salt and white flowers', 'https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?w=400'),
+('Golden Sunset', 'Warm amber and vanilla with citrus top notes', 'https://images.unsplash.com/photo-1594035910387-fea47794261f?w=400');
+
+-- Insert product variants for each product
+INSERT INTO product_variants (product_id, size_ml, regular_price, bulk_price, bulk_min_quantity, stock_quantity)
+SELECT 
+  p.id,
+  35,
+  65.99,
+  55.99,
+  6,
+  20
+FROM products p WHERE p.name = 'Midnight Elegance';
+
+INSERT INTO product_variants (product_id, size_ml, regular_price, bulk_price, bulk_min_quantity, stock_quantity)
+SELECT 
+  p.id,
+  50,
+  89.99,
+  75.99,
+  6,
+  25
+FROM products p WHERE p.name = 'Midnight Elegance';
+
+INSERT INTO product_variants (product_id, size_ml, regular_price, bulk_price, bulk_min_quantity, stock_quantity)
+SELECT 
+  p.id,
+  100,
+  145.99,
+  125.99,
+  4,
+  15
+FROM products p WHERE p.name = 'Midnight Elegance';
+
+-- Repeat for Ocean Breeze
+INSERT INTO product_variants (product_id, size_ml, regular_price, bulk_price, bulk_min_quantity, stock_quantity)
+SELECT 
+  p.id,
+  35,
+  55.99,
+  47.99,
+  6,
+  30
+FROM products p WHERE p.name = 'Ocean Breeze';
+
+INSERT INTO product_variants (product_id, size_ml, regular_price, bulk_price, bulk_min_quantity, stock_quantity)
+SELECT 
+  p.id,
+  50,
+  75.99,
+  65.99,
+  6,
+  30
+FROM products p WHERE p.name = 'Ocean Breeze';
+
+INSERT INTO product_variants (product_id, size_ml, regular_price, bulk_price, bulk_min_quantity, stock_quantity)
+SELECT 
+  p.id,
+  100,
+  125.99,
+  109.99,
+  4,
+  20
+FROM products p WHERE p.name = 'Ocean Breeze';
+
+-- Repeat for Golden Sunset
+INSERT INTO product_variants (product_id, size_ml, regular_price, bulk_price, bulk_min_quantity, stock_quantity)
+SELECT 
+  p.id,
+  35,
+  69.99,
+  59.99,
+  6,
+  25
+FROM products p WHERE p.name = 'Golden Sunset';
+
+INSERT INTO product_variants (product_id, size_ml, regular_price, bulk_price, bulk_min_quantity, stock_quantity)
+SELECT 
+  p.id,
+  50,
+  92.99,
+  79.99,
+  6,
+  20
+FROM products p WHERE p.name = 'Golden Sunset';
+
+INSERT INTO product_variants (product_id, size_ml, regular_price, bulk_price, bulk_min_quantity, stock_quantity)
+SELECT 
+  p.id,
+  100,
+  155.99,
+  135.99,
+  4,
+  18
+FROM products p WHERE p.name = 'Golden Sunset';
+
+-- Add is_new_arrival column to products table
+ALTER TABLE products ADD COLUMN is_new_arrival BOOLEAN DEFAULT false;
+
+-- Update some existing products to be marked as new arrivals for demonstration
+UPDATE products SET is_new_arrival = true WHERE name IN ('Midnight Elegance', 'Ocean Breeze') LIMIT 2;
