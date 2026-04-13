@@ -63,7 +63,9 @@ export async function POST(request: NextRequest) {
       .join(', ')
 
     // ─── Build callback URLs ──────────────────────────────────────────────
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+    const baseUrl =
+      process.env.NEXT_PUBLIC_BASE_URL ||
+      `${request.headers.get('x-forwarded-proto') ?? 'https'}://${request.headers.get('host')}`
     const notifyUrl  = `${baseUrl}/api/bobpay/webhook`
     const successUrl = `${baseUrl}/success?order_id=${customPaymentId}`
     const pendingUrl = `${baseUrl}/pending?order_id=${customPaymentId}`
