@@ -2,40 +2,325 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Google Fonts ─────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&display=swap');
+
+/* ─── CSS Theme Variables ───────────────────────────────────── */
+:root {
+  --font-display: 'Cormorant Garamond', Georgia, serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+
+  /* Shared gold accent (both themes) */
+  --gold: #C9A84C;
+  --gold-light: #E8D5A3;
+  --gold-dark: #9A7A32;
+}
+
+/* Rose & Gold Theme (default) */
+[data-theme="rose"],
+:root {
+  --bg: #FAF8F5;
+  --bg-alt: #F5F0E8;
+  --surface: #FFFFFF;
+  --surface-alt: #FDF9F4;
+  --border: rgba(201, 168, 76, 0.2);
+  --border-strong: rgba(201, 168, 76, 0.4);
+  --text: #1C1C1E;
+  --text-muted: #6B6B6B;
+  --text-faint: #9B9B9B;
+  --accent: #9D174D;
+  --accent-light: #FCE7F3;
+  --accent-hover: #831843;
+  --header-bg: rgba(250, 248, 245, 0.92);
+  --card-shadow: 0 4px 24px rgba(157, 23, 77, 0.07);
+  --card-shadow-hover: 0 12px 40px rgba(157, 23, 77, 0.14);
+  --footer-bg: #1C1C1E;
+  --footer-text: #D4C9B8;
+}
+
+/* Noir & Gold Theme */
+[data-theme="noir"] {
+  --bg: #0A0A0A;
+  --bg-alt: #111111;
+  --surface: #141414;
+  --surface-alt: #1A1A1A;
+  --border: rgba(201, 168, 76, 0.15);
+  --border-strong: rgba(201, 168, 76, 0.35);
+  --text: #F5F0E8;
+  --text-muted: #A0978A;
+  --text-faint: #6B6259;
+  --accent: #C9A84C;
+  --accent-light: rgba(201, 168, 76, 0.1);
+  --accent-hover: #E8D5A3;
+  --header-bg: rgba(10, 10, 10, 0.92);
+  --card-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+  --card-shadow-hover: 0 12px 40px rgba(201, 168, 76, 0.12);
+  --footer-bg: #050505;
+  --footer-text: #A0978A;
+}
+
+/* ─── Base Styles ───────────────────────────────────────────── */
 @layer base {
   html {
     scroll-behavior: smooth;
   }
-  
+
   body {
+    background-color: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    transition: background-color 0.35s ease, color 0.35s ease;
+  }
+
+  ::selection {
+    background: var(--gold);
+    color: #fff;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--gold); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--gold-dark); }
+}
+
+/* ─── Typography ────────────────────────────────────────────── */
+@layer components {
+  .font-display {
+    font-family: var(--font-display);
+  }
+
+  /* ─── Luxury Buttons ────────────────────────────────────── */
+  .btn-gold {
+    background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dark) 100%);
+    color: #fff;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-size: 0.7rem;
+    font-weight: 500;
+    padding: 0.75rem 2rem;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  .btn-gold::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, var(--gold-dark) 0%, var(--gold) 100%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+  .btn-gold:hover::after { opacity: 1; }
+  .btn-gold span { position: relative; z-index: 1; }
+
+  .btn-outline-gold {
+    border: 1px solid var(--gold);
+    color: var(--gold);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-size: 0.7rem;
+    font-weight: 500;
+    padding: 0.75rem 2rem;
+    transition: all 0.3s ease;
+    background: transparent;
+  }
+  .btn-outline-gold:hover {
+    background: var(--gold);
+    color: #fff;
+  }
+
+  /* ─── Legacy Button (kept for compat) ───────────────────── */
+  .btn-primary {
+    background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dark) 100%);
+    color: #fff;
+    padding: 0.75rem 1.5rem;
+    border-radius: 0;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-size: 0.7rem;
+    transition: all 0.3s;
+  }
+  .btn-primary:hover {
+    opacity: 0.88;
+  }
+
+  /* ─── Product Cards ──────────────────────────────────────── */
+  .card {
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    box-shadow: var(--card-shadow);
+    transition: box-shadow 0.4s ease, transform 0.4s ease, border-color 0.4s ease;
+  }
+  .card:hover {
+    box-shadow: var(--card-shadow-hover);
+    border-color: var(--border-strong);
+  }
+
+  /* ─── Gold Separator ─────────────────────────────────────── */
+  .gold-line {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  }
+  .gold-line-left {
+    height: 1px;
+    width: 3rem;
+    background: var(--gold);
+  }
+
+  /* ─── Section Label ──────────────────────────────────────── */
+  .section-label {
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    font-size: 0.65rem;
+    color: var(--gold);
+    font-family: var(--font-body);
+    font-weight: 500;
   }
 }
 
-@layer components {
-  .btn-primary {
-    background-image: linear-gradient(to right, #f43f5e, #f59e42); /* rose-500 to amber-500 */
-    color: #fff;
-    padding-left: 1.5rem;
-    padding-right: 1.5rem;
-    padding-top: 0.5rem;
-    padding-bottom: 0.5rem;
-    border-radius: 9999px;
-    font-weight: 500;
-    transition: all 0.2s;
-  }
-  .btn-primary:hover {
-    background-image: linear-gradient(to right, #e11d48, #d97706); /* rose-600 to amber-600 */
-  }
-  
-  .card {
-    background-color: #fff;
-    border-radius: 1rem;
-    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1);
-    transition: all 0.3s;
-  }
-  .card:hover {
-    box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1);
-  }
+/* ─── Animations ────────────────────────────────────────────── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+@keyframes floatY {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-12px); }
+}
+@keyframes goldPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(201, 168, 76, 0); }
+  50%       { box-shadow: 0 0 0 8px rgba(201, 168, 76, 0.12); }
+}
+
+.animate-fade-in-up   { animation: fadeInUp 0.7s ease both; }
+.animate-fade-in      { animation: fadeIn 0.5s ease both; }
+.animate-float        { animation: floatY 4s ease-in-out infinite; }
+.animate-gold-pulse   { animation: goldPulse 2.5s ease-in-out infinite; }
+
+.anim-delay-100 { animation-delay: 0.1s; }
+.anim-delay-200 { animation-delay: 0.2s; }
+.anim-delay-300 { animation-delay: 0.3s; }
+.anim-delay-400 { animation-delay: 0.4s; }
+.anim-delay-500 { animation-delay: 0.5s; }
+
+/* ─── Shimmer text ───────────────────────────────────────────── */
+.text-shimmer {
+  background: linear-gradient(90deg, var(--gold-dark), var(--gold), var(--gold-light), var(--gold));
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer 3s linear infinite;
+}
+
+/* ─── Fragrance Notes Overlay ───────────────────────────────── */
+.notes-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.5) 55%, transparent 100%);
+  opacity: 0;
+  transition: opacity 0.45s ease;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 1.5rem;
+}
+.group:hover .notes-overlay { opacity: 1; }
+
+/* ─── Theme Toggle ───────────────────────────────────────────── */
+.theme-toggle {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--gold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+.theme-toggle:hover {
+  background: var(--gold);
+  color: #fff;
+  border-color: var(--gold);
+}
+
+/* ─── Cart Sidebar ───────────────────────────────────────────── */
+.cart-sidebar {
+  background: var(--surface);
+  color: var(--text);
+}
+.cart-item {
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+}
+
+/* ─── Size Selector Buttons ─────────────────────────────────── */
+.size-btn {
+  border: 1px solid var(--border-strong);
+  color: var(--text-muted);
+  background: transparent;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  padding: 0.35rem 0.85rem;
+  transition: all 0.25s ease;
+  font-family: var(--font-body);
+}
+.size-btn:hover:not(:disabled) {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+.size-btn.active {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: #fff;
+}
+.size-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* ─── Announcement Bar ──────────────────────────────────────── */
+.announcement-bar {
+  background: var(--gold);
+  color: #fff;
+  text-align: center;
+  padding: 0.45rem 1rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+/* ─── Testimonial cards ─────────────────────────────────────── */
+.testimonial-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 2rem;
+  position: relative;
+}
+.testimonial-card::before {
+  content: '"';
+  font-family: var(--font-display);
+  font-size: 5rem;
+  color: var(--gold);
+  opacity: 0.2;
+  position: absolute;
+  top: -0.5rem;
+  left: 1.25rem;
+  line-height: 1;
 }

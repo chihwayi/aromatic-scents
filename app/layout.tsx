@@ -1,22 +1,37 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+import type { ReactNode } from 'react'
+import { Inter, Cormorant_Garamond } from 'next/font/google'
 import './globals.css'
 
-const inter = Inter({ subsets: ['latin'] })
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+  display: 'swap',
+})
+
+const cormorant = Cormorant_Garamond({
+  subsets: ['latin'],
+  weight: ['300', '400', '500', '600'],
+  style: ['normal', 'italic'],
+  variable: '--font-cormorant',
+  display: 'swap',
+})
 
 export const metadata: Metadata = {
-  title: 'Aromatic Scents - Premium Perfumes',
-  description: 'Discover our curated collection of premium perfumes, crafted for those who appreciate the art of scent',
+  title: 'Aromatic Scents — Premium Fragrances',
+  description: 'A curated collection of exceptional perfumes, crafted for those who understand the art of scent.',
 }
 
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: ReactNode
 }) {
   return (
-    <html lang="en">
-      <body className={inter.className}>{children}</body>
+    <html lang="en" data-theme="rose">
+      <body className={`${inter.variable} ${cormorant.variable} font-sans`}>
+        {children}
+      </body>
     </html>
   )
 }

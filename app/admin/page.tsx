@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Edit, Trash2, Save, X, LogOut, User, Package, DollarSign, TrendingUp, Settings } from 'lucide-react'
+import { Plus, Edit, Trash2, Save, X, LogOut, User, Package, DollarSign, TrendingUp, Settings, ShoppingCart, CheckCircle2, BarChart3, Truck } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
-import Link from 'next/link' 
+import Link from 'next/link'
 import Image from 'next/image'
 
 interface ProductVariant {
@@ -31,7 +31,33 @@ interface AdminStats {
   totalVariants: number
   totalValue: number
   lowStockItems: number
-  recentOrders: number
+}
+
+interface OrderStats {
+  total_orders: number
+  paid_orders: number
+  pending_orders: number
+  failed_orders: number
+  cancelled_orders: number
+  total_revenue: number
+  avg_order_value: number
+  total_delivery_collected: number
+  revenue_last_30_days: number
+}
+
+interface RecentOrder {
+  id: string
+  custom_payment_id: string
+  customer_email: string
+  total_amount: number
+  paid_amount: number
+  status: string
+  payment_method: string
+  include_delivery: boolean
+  delivery_cost: number
+  items: Array<{ name: string; size: number; quantity: number; price: number }>
+  is_test: boolean
+  created_at: string
 }
 
 interface AppSettings {
@@ -55,8 +81,20 @@ export default function AdminPanel() {
     totalVariants: 0,
     totalValue: 0,
     lowStockItems: 0,
-    recentOrders: 0
   })
+  const [orderStats, setOrderStats] = useState<OrderStats>({
+    total_orders: 0,
+    paid_orders: 0,
+    pending_orders: 0,
+    failed_orders: 0,
+    cancelled_orders: 0,
+    total_revenue: 0,
+    avg_order_value: 0,
+    total_delivery_collected: 0,
+    revenue_last_30_days: 0,
+  })
+  const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([])
+  const [activeTab, setActiveTab] = useState<'overview' | 'orders' | 'products'>('overview')
   const router = useRouter()
 
   const emptyProduct: Product = {
@@ -89,15 +127,43 @@ export default function AdminPanel() {
       }
     })
 
-    const recentOrders = 0 // This would need to be fetched from orders table
+    setStats({ totalProducts, totalVariants, totalValue, lowStockItems })
+  }, [])
 
-    setStats({
-      totalProducts,
-      totalVariants,
-      totalValue,
-      lowStockItems,
-      recentOrders
-    })
+  const fetchOrderStats = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.from('order_stats').select('*').maybeSingle()
+      if (!error && data) {
+        setOrderStats({
+          total_orders: data.total_orders || 0,
+          paid_orders: data.paid_orders || 0,
+          pending_orders: data.pending_orders || 0,
+          failed_orders: data.failed_orders || 0,
+          cancelled_orders: data.cancelled_orders || 0,
+          total_revenue: parseFloat(data.total_revenue) || 0,
+          avg_order_value: parseFloat(data.avg_order_value) || 0,
+          total_delivery_collected: parseFloat(data.total_delivery_collected) || 0,
+          revenue_last_30_days: parseFloat(data.revenue_last_30_days) || 0,
+        })
+      }
+    } catch (error) {
+      console.error('Error fetching order stats:', error)
+    }
+  }, [])
+
+  const fetchRecentOrders = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('id, custom_payment_id, customer_email, total_amount, paid_amount, status, payment_method, include_delivery, delivery_cost, items, is_test, created_at')
+        .order('created_at', { ascending: false })
+        .limit(25)
+      if (!error && data) {
+        setRecentOrders(data as RecentOrder[])
+      }
+    } catch (error) {
+      console.error('Error fetching recent orders:', error)
+    }
   }, [])
 
   const fetchSettings = useCallback(async () => {
@@ -146,12 +212,12 @@ export default function AdminPanel() {
       }
 
       setUser(session.user)
-      await Promise.all([fetchProducts(), fetchSettings()])
+      await Promise.all([fetchProducts(), fetchSettings(), fetchOrderStats(), fetchRecentOrders()])
     } catch (error) {
       console.error('Auth check failed:', error)
       router.push('/admin/login')
     }
-  }, [router, fetchProducts, fetchSettings])
+  }, [router, fetchProducts, fetchSettings, fetchOrderStats, fetchRecentOrders])
 
   useEffect(() => {
     checkAuth()
@@ -450,6 +516,22 @@ export default function AdminPanel() {
     )
   }
 
+  const statusBadge = (status: string) => {
+    const base = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium'
+    const map: Record<string, string> = {
+      paid: 'bg-green-100 text-green-800',
+      complete: 'bg-green-100 text-green-800',
+      pending: 'bg-yellow-100 text-yellow-800',
+      failed: 'bg-red-100 text-red-800',
+      cancelled: 'bg-gray-100 text-gray-600',
+    }
+    return (
+      <span className={`${base} ${map[status] ?? 'bg-gray-100 text-gray-600'}`}>
+        {status}
+      </span>
+    )
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-rose-50 to-amber-50 flex items-center justify-center">
@@ -473,10 +555,10 @@ export default function AdminPanel() {
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
-                <p className="text-sm text-gray-600">Manage your perfume store</p>
+                <p className="text-sm text-gray-600">Aromatic Scents</p>
               </div>
             </div>
-            
+
             <div className="flex items-center space-x-4">
               <button
                 onClick={() => setShowSettings(true)}
@@ -489,10 +571,7 @@ export default function AdminPanel() {
                 <User className="h-4 w-4" />
                 <span>{user?.email}</span>
               </div>
-              <Link
-                href="/"
-                className="text-rose-600 hover:text-rose-700 font-medium transition-colors duration-300"
-              >
+              <Link href="/" className="text-rose-600 hover:text-rose-700 font-medium transition-colors duration-300">
                 View Store
               </Link>
               <button
@@ -508,193 +587,411 @@ export default function AdminPanel() {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-rose-100/50 shadow-lg">
-            <div className="flex items-center">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
-                <Package className="h-6 w-6 text-white" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Total Products</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.totalProducts}</p>
-              </div>
-            </div>
-          </div>
 
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-rose-100/50 shadow-lg">
-            <div className="flex items-center">
-              <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center">
-                <DollarSign className="h-6 w-6 text-white" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Inventory Value</p>
-                <p className="text-2xl font-bold text-gray-900">R{stats.totalValue.toFixed(2)}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-rose-100/50 shadow-lg">
-            <div className="flex items-center">
-              <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl flex items-center justify-center">
-                <TrendingUp className="h-6 w-6 text-white" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Low Stock Variants</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.lowStockItems}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-rose-100/50 shadow-lg">
-            <div className="flex items-center">
-              <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
-                <Package className="h-6 w-6 text-white" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Product Variants</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.totalVariants}</p>
-              </div>
-            </div>
-          </div>
+        {/* Tab Navigation */}
+        <div className="flex space-x-1 mb-8 bg-white/60 backdrop-blur-sm rounded-xl p-1 w-fit border border-rose-100/50 shadow-sm">
+          {(['overview', 'orders', 'products'] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-5 py-2 rounded-lg text-sm font-medium transition-all duration-200 capitalize ${
+                activeTab === tab
+                  ? 'bg-gradient-to-r from-rose-500 to-amber-500 text-white shadow'
+                  : 'text-gray-600 hover:text-rose-600'
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
         </div>
 
-        {/* Add New Product Button */}
-        {!isAddingNew && !editingProduct && (
-          <div className="mb-8">
-            <button
-              onClick={() => setIsAddingNew(true)}
-              className="flex items-center px-8 py-4 bg-gradient-to-r from-rose-500 to-amber-500 text-white rounded-xl hover:from-rose-600 hover:to-amber-600 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
-            >
-              <Plus className="h-5 w-5 mr-2" />
-              Add New Product
-            </button>
-            {/* Migration button - commented out after successful migration */}
-            {/* <button
-              onClick={async () => {
-                try {
-                  const response = await fetch('/api/migrate', { method: 'POST' })
-                  const result = await response.json()
-                  if (result.success) {
-                    alert(`Migration successful! Updated ${result.updatedProducts} products.`)
-                    fetchProducts()
-                  } else {
-                    alert('Migration failed: ' + result.error)
-                  }
-                } catch (error) {
-                  alert('Migration failed: ' + error)
-                }
-              }}
-              className="flex items-center px-6 py-4 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-all duration-300 shadow-lg hover:shadow-xl ml-4"
-            >
-              Run Migration
-            </button> */}
-          </div>
-        )}
-
-        {/* Add New Product Form */}
-        {isAddingNew && (
-          <div className="mb-8">
-            <h2 className="text-2xl font-semibold text-gray-900 mb-6">Add New Product</h2>
-            <ProductForm
-              product={emptyProduct}
-              onSave={saveProduct}
-              onCancel={() => setIsAddingNew(false)}
-            />
-          </div>
-        )}
-
-        {/* Edit Product Form */}
-        {editingProduct && (
-          <div className="mb-8">
-            <h2 className="text-2xl font-semibold text-gray-900 mb-6">Edit Product</h2>
-            <ProductForm
-              product={editingProduct}
-              onSave={saveProduct}
-              onCancel={() => setEditingProduct(null)}
-            />
-          </div>
-        )}
-
-        {/* Products List */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-rose-100/50">
-          <div className="px-8 py-6 border-b border-gray-200">
-            <h2 className="text-xl font-semibold text-gray-900">Products ({products.length})</h2>
-          </div>
-          
-          {products.length === 0 ? (
-            <div className="p-12 text-center text-gray-500">
-              <Package className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <p className="text-lg">No products found</p>
-              <p className="text-sm">Add your first product to get started.</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-gray-200">
-              {products.map((product) => (
-                <div key={product.id} className="p-8 hover:bg-gray-50/50 transition-colors duration-300">
-                  <div className="flex items-start space-x-6">
-                    <Image
-                      src={product.image_url || 'https://via.placeholder.com/100'}
-                      alt={product.name}
-                      width={400}
-                      height={400}
-                      className="w-24 h-24 object-cover rounded-xl shadow-md"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = 'https://via.placeholder.com/100'
-                      }}
-                    />
-                    
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-xl font-semibold text-gray-900">{product.name}</h3>
-                        {product.is_new_arrival && (
-                          <span className="px-2 py-1 bg-gradient-to-r from-rose-500 to-amber-500 text-white text-xs rounded-full font-medium">
-                            NEW
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-gray-600 text-sm mb-4 line-clamp-2">{product.description}</p>
-                      
-                      {/* Product Variants */}
-                      <div className="space-y-2">
-                        <h4 className="text-sm font-medium text-gray-700">Available Sizes:</h4>
-                        <div className="grid grid-cols-3 gap-3">
-                          {product.product_variants?.map((variant) => (
-                            <div key={variant.id} className="bg-gray-50 rounded-lg p-3 text-xs">
-                              <div className="font-medium text-gray-900">{variant.size_ml}ml</div>
-                              <div className="text-green-600">R{variant.regular_price.toFixed(2)}</div>
-                              {variant.bulk_price > 0 && (
-                                <div className="text-blue-600">Bulk: R{variant.bulk_price.toFixed(2)}</div>
-                              )}
-                              <div className={`${variant.stock_quantity < 5 ? 'text-red-600' : 'text-gray-600'}`}>
-                                Stock: {variant.stock_quantity}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
+        {/* ── OVERVIEW TAB ── */}
+        {activeTab === 'overview' && (
+          <>
+            {/* Revenue Stats */}
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                <BarChart3 className="h-5 w-5 text-rose-500" /> Revenue & Orders
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-rose-100/50 shadow-lg">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm font-medium text-gray-500">Total Revenue</p>
+                    <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center">
+                      <DollarSign className="h-5 w-5 text-white" />
                     </div>
+                  </div>
+                  <p className="text-3xl font-bold text-gray-900">R{orderStats.total_revenue.toFixed(2)}</p>
+                  <p className="text-xs text-gray-400 mt-1">all time, paid orders only</p>
+                </div>
 
-                    <div className="flex space-x-3">
-                      <button
-                        onClick={() => setEditingProduct(product)}
-                        className="p-3 text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-300"
-                      >
-                        <Edit className="h-5 w-5" />
-                      </button>
-                      <button
-                        onClick={() => deleteProduct(product.id!)}
-                        className="p-3 text-red-600 hover:bg-red-50 rounded-xl transition-all duration-300"
-                      >
-                        <Trash2 className="h-5 w-5" />
-                      </button>
+                <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-rose-100/50 shadow-lg">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm font-medium text-gray-500">Last 30 Days</p>
+                    <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center">
+                      <TrendingUp className="h-5 w-5 text-white" />
+                    </div>
+                  </div>
+                  <p className="text-3xl font-bold text-gray-900">R{orderStats.revenue_last_30_days.toFixed(2)}</p>
+                  <p className="text-xs text-gray-400 mt-1">rolling 30-day window</p>
+                </div>
+
+                <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-rose-100/50 shadow-lg">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm font-medium text-gray-500">Avg Order Value</p>
+                    <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl flex items-center justify-center">
+                      <BarChart3 className="h-5 w-5 text-white" />
+                    </div>
+                  </div>
+                  <p className="text-3xl font-bold text-gray-900">R{orderStats.avg_order_value.toFixed(2)}</p>
+                  <p className="text-xs text-gray-400 mt-1">paid orders only</p>
+                </div>
+
+                <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-rose-100/50 shadow-lg">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm font-medium text-gray-500">Delivery Collected</p>
+                    <div className="w-10 h-10 bg-gradient-to-br from-sky-500 to-blue-600 rounded-xl flex items-center justify-center">
+                      <Truck className="h-5 w-5 text-white" />
+                    </div>
+                  </div>
+                  <p className="text-3xl font-bold text-gray-900">R{orderStats.total_delivery_collected.toFixed(2)}</p>
+                  <p className="text-xs text-gray-400 mt-1">from paid deliveries</p>
+                </div>
+
+                <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-rose-100/50 shadow-lg">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm font-medium text-gray-500">Total Orders</p>
+                    <div className="w-10 h-10 bg-gradient-to-br from-rose-500 to-pink-600 rounded-xl flex items-center justify-center">
+                      <ShoppingCart className="h-5 w-5 text-white" />
+                    </div>
+                  </div>
+                  <p className="text-3xl font-bold text-gray-900">{orderStats.total_orders}</p>
+                  <div className="flex gap-3 mt-2 text-xs">
+                    <span className="text-green-600 font-medium">{orderStats.paid_orders} paid</span>
+                    <span className="text-yellow-600 font-medium">{orderStats.pending_orders} pending</span>
+                    <span className="text-red-500 font-medium">{orderStats.failed_orders} failed</span>
+                  </div>
+                </div>
+
+                <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-rose-100/50 shadow-lg">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm font-medium text-gray-500">Conversion</p>
+                    <div className="w-10 h-10 bg-gradient-to-br from-lime-500 to-green-600 rounded-xl flex items-center justify-center">
+                      <CheckCircle2 className="h-5 w-5 text-white" />
+                    </div>
+                  </div>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {orderStats.total_orders > 0
+                      ? Math.round((orderStats.paid_orders / orderStats.total_orders) * 100)
+                      : 0}%
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">{orderStats.paid_orders} of {orderStats.total_orders} orders paid</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Inventory Stats */}
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                <Package className="h-5 w-5 text-rose-500" /> Inventory
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-rose-100/50 shadow-lg">
+                  <div className="flex items-center">
+                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
+                      <Package className="h-6 w-6 text-white" />
+                    </div>
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-gray-600">Products</p>
+                      <p className="text-2xl font-bold text-gray-900">{stats.totalProducts}</p>
                     </div>
                   </div>
                 </div>
-              ))}
+                <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-rose-100/50 shadow-lg">
+                  <div className="flex items-center">
+                    <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
+                      <Package className="h-6 w-6 text-white" />
+                    </div>
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-gray-600">Variants</p>
+                      <p className="text-2xl font-bold text-gray-900">{stats.totalVariants}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-rose-100/50 shadow-lg">
+                  <div className="flex items-center">
+                    <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center">
+                      <DollarSign className="h-6 w-6 text-white" />
+                    </div>
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-gray-600">Inventory Value</p>
+                      <p className="text-2xl font-bold text-gray-900">R{stats.totalValue.toFixed(0)}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-rose-100/50 shadow-lg">
+                  <div className="flex items-center">
+                    <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-xl flex items-center justify-center">
+                      <TrendingUp className="h-6 w-6 text-white" />
+                    </div>
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-gray-600">Low Stock</p>
+                      <p className={`text-2xl font-bold ${stats.lowStockItems > 0 ? 'text-red-600' : 'text-gray-900'}`}>
+                        {stats.lowStockItems}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-          )}
-        </div>
+
+            {/* Quick recent orders preview */}
+            {recentOrders.length > 0 && (
+              <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-rose-100/50">
+                <div className="px-8 py-5 border-b border-gray-200 flex items-center justify-between">
+                  <h2 className="text-lg font-semibold text-gray-900">Recent Orders</h2>
+                  <button
+                    onClick={() => setActiveTab('orders')}
+                    className="text-sm text-rose-600 hover:text-rose-700 font-medium"
+                  >
+                    View all →
+                  </button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100 bg-gray-50/50">
+                        <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Order ID</th>
+                        <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
+                        <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                        <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {recentOrders.slice(0, 5).map((order) => (
+                        <tr key={order.id} className="hover:bg-gray-50/50 transition-colors">
+                          <td className="px-6 py-4 font-mono text-xs text-gray-600">{order.custom_payment_id}</td>
+                          <td className="px-6 py-4 text-gray-700">{order.customer_email}</td>
+                          <td className="px-6 py-4 font-medium text-gray-900">R{(order.paid_amount || order.total_amount).toFixed(2)}</td>
+                          <td className="px-6 py-4">{statusBadge(order.status)}</td>
+                          <td className="px-6 py-4 text-gray-500">{new Date(order.created_at).toLocaleDateString('en-ZA')}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ── ORDERS TAB ── */}
+        {activeTab === 'orders' && (
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-rose-100/50">
+            <div className="px-8 py-5 border-b border-gray-200 flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-gray-900">All Orders ({recentOrders.length})</h2>
+              <button
+                onClick={() => { fetchOrderStats(); fetchRecentOrders() }}
+                className="flex items-center px-4 py-2 text-sm text-gray-600 hover:text-rose-600 border border-gray-200 rounded-lg hover:border-rose-300 transition-colors"
+              >
+                Refresh
+              </button>
+            </div>
+
+            {recentOrders.length === 0 ? (
+              <div className="p-12 text-center text-gray-500">
+                <ShoppingCart className="h-16 w-16 text-gray-200 mx-auto mb-4" />
+                <p className="text-lg">No orders yet</p>
+                <p className="text-sm">Orders will appear here once customers complete payments.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-200 bg-gray-50/70">
+                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Order Ref</th>
+                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
+                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Items</th>
+                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Subtotal</th>
+                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Delivery</th>
+                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Total Paid</th>
+                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Method</th>
+                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {recentOrders.map((order) => {
+                      const itemCount = order.items?.reduce((sum, i) => sum + i.quantity, 0) ?? 0
+                      const subtotal = order.total_amount - (order.include_delivery ? order.delivery_cost : 0)
+                      return (
+                        <tr key={order.id} className="hover:bg-rose-50/30 transition-colors">
+                          <td className="px-6 py-4">
+                            <span className="font-mono text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded">
+                              {order.custom_payment_id}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-gray-700 max-w-[180px] truncate">{order.customer_email}</td>
+                          <td className="px-6 py-4">
+                            <div className="text-xs text-gray-600 space-y-0.5">
+                              {order.items?.slice(0, 2).map((item, i) => (
+                                <div key={i}>{item.name} {item.size}ml ×{item.quantity}</div>
+                              ))}
+                              {(order.items?.length ?? 0) > 2 && (
+                                <div className="text-gray-400">+{(order.items?.length ?? 0) - 2} more</div>
+                              )}
+                              <div className="text-gray-400">{itemCount} unit{itemCount !== 1 ? 's' : ''}</div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-gray-700">R{subtotal.toFixed(2)}</td>
+                          <td className="px-6 py-4">
+                            {order.include_delivery ? (
+                              <span className="text-sky-600">R{order.delivery_cost.toFixed(2)}</span>
+                            ) : (
+                              <span className="text-gray-400">—</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 font-semibold text-gray-900">
+                            R{(order.paid_amount || order.total_amount).toFixed(2)}
+                          </td>
+                          <td className="px-6 py-4">{statusBadge(order.status)}</td>
+                          <td className="px-6 py-4 text-gray-500 capitalize text-xs">
+                            {order.payment_method ? order.payment_method.replace(/-/g, ' ') : '—'}
+                          </td>
+                          <td className="px-6 py-4 text-gray-500 whitespace-nowrap">
+                            {new Date(order.created_at).toLocaleDateString('en-ZA')}{' '}
+                            <span className="text-xs text-gray-400">
+                              {new Date(order.created_at).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── PRODUCTS TAB ── */}
+        {activeTab === 'products' && (
+          <>
+            {!isAddingNew && !editingProduct && (
+              <div className="mb-6">
+                <button
+                  onClick={() => setIsAddingNew(true)}
+                  className="flex items-center px-8 py-4 bg-gradient-to-r from-rose-500 to-amber-500 text-white rounded-xl hover:from-rose-600 hover:to-amber-600 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
+                >
+                  <Plus className="h-5 w-5 mr-2" />
+                  Add New Product
+                </button>
+              </div>
+            )}
+
+            {isAddingNew && (
+              <div className="mb-8">
+                <h2 className="text-2xl font-semibold text-gray-900 mb-6">Add New Product</h2>
+                <ProductForm
+                  product={emptyProduct}
+                  onSave={saveProduct}
+                  onCancel={() => setIsAddingNew(false)}
+                />
+              </div>
+            )}
+
+            {editingProduct && (
+              <div className="mb-8">
+                <h2 className="text-2xl font-semibold text-gray-900 mb-6">Edit Product</h2>
+                <ProductForm
+                  product={editingProduct}
+                  onSave={saveProduct}
+                  onCancel={() => setEditingProduct(null)}
+                />
+              </div>
+            )}
+
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-rose-100/50">
+              <div className="px-8 py-6 border-b border-gray-200">
+                <h2 className="text-xl font-semibold text-gray-900">Products ({products.length})</h2>
+              </div>
+
+              {products.length === 0 ? (
+                <div className="p-12 text-center text-gray-500">
+                  <Package className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                  <p className="text-lg">No products found</p>
+                  <p className="text-sm">Add your first product to get started.</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-200">
+                  {products.map((product) => (
+                    <div key={product.id} className="p-8 hover:bg-gray-50/50 transition-colors duration-300">
+                      <div className="flex items-start space-x-6">
+                        <Image
+                          src={product.image_url || 'https://via.placeholder.com/100'}
+                          alt={product.name}
+                          width={400}
+                          height={400}
+                          className="w-24 h-24 object-cover rounded-xl shadow-md"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = 'https://via.placeholder.com/100'
+                          }}
+                        />
+
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <h3 className="text-xl font-semibold text-gray-900">{product.name}</h3>
+                            {product.is_new_arrival && (
+                              <span className="px-2 py-1 bg-gradient-to-r from-rose-500 to-amber-500 text-white text-xs rounded-full font-medium">
+                                NEW
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-gray-600 text-sm mb-4 line-clamp-2">{product.description}</p>
+
+                          <div className="space-y-2">
+                            <h4 className="text-sm font-medium text-gray-700">Available Sizes:</h4>
+                            <div className="grid grid-cols-3 gap-3">
+                              {product.product_variants?.map((variant) => (
+                                <div key={variant.id} className="bg-gray-50 rounded-lg p-3 text-xs">
+                                  <div className="font-medium text-gray-900">{variant.size_ml}ml</div>
+                                  <div className="text-green-600">R{variant.regular_price.toFixed(2)}</div>
+                                  {variant.bulk_price > 0 && (
+                                    <div className="text-blue-600">Bulk: R{variant.bulk_price.toFixed(2)}</div>
+                                  )}
+                                  <div className={variant.stock_quantity < 5 ? 'text-red-600' : 'text-gray-600'}>
+                                    Stock: {variant.stock_quantity}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex space-x-3">
+                          <button
+                            onClick={() => setEditingProduct(product)}
+                            className="p-3 text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-300"
+                          >
+                            <Edit className="h-5 w-5" />
+                          </button>
+                          <button
+                            onClick={() => deleteProduct(product.id!)}
+                            className="p-3 text-red-600 hover:bg-red-50 rounded-xl transition-all duration-300"
+                          >
+                            <Trash2 className="h-5 w-5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
       </div>
 
       {/* Settings Modal */}
