@@ -388,7 +388,7 @@ export default function HomePage() {
 
       {/* ─── Hero ────────────────────────────────────────────────────────── */}
       <section
-        className="relative min-h-[92vh] flex items-center overflow-hidden"
+        className="relative min-h-[60vh] md:min-h-[92vh] flex items-center overflow-hidden"
         style={{ background: 'var(--bg)' }}
       >
         {/* Decorative gold circles */}
@@ -405,18 +405,18 @@ export default function HomePage() {
           style={{ background: 'var(--gold)', opacity: 0.4 }}
         />
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full pt-12 pb-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full pt-6 pb-10 md:pt-12 md:pb-20">
           <div className="max-w-2xl">
             <p className="section-label mb-8 animate-fade-in-up">
               Premium Fragrances · South Africa
             </p>
 
             <h2
-              className="font-display leading-none mb-8 animate-fade-in-up anim-delay-100"
+              className="font-display leading-none mb-4 sm:mb-8 animate-fade-in-up anim-delay-100"
               style={{
                 color: 'var(--text)',
-                fontWeight: 300,
-                fontSize: 'clamp(3.5rem, 7vw, 6.5rem)',
+                fontWeight: 400,
+                fontSize: 'clamp(2.5rem, 7vw, 6.5rem)',
                 lineHeight: 1.05,
               }}
             >
@@ -425,11 +425,11 @@ export default function HomePage() {
               <em style={{ color: 'var(--gold)', fontStyle: 'italic' }}>of Scent</em>
             </h2>
 
-            <div className="gold-line mb-8 animate-fade-in-up anim-delay-200" />
+            <div className="gold-line mb-4 sm:mb-8 animate-fade-in-up anim-delay-200" />
 
             <p
-              className="text-lg leading-relaxed mb-10 max-w-md animate-fade-in-up anim-delay-300"
-              style={{ color: 'var(--text-muted)', fontWeight: 300 }}
+              className="text-sm sm:text-lg leading-relaxed mb-6 sm:mb-10 max-w-md animate-fade-in-up anim-delay-300"
+              style={{ color: 'var(--text-muted)', fontWeight: 400 }}
             >
               Curated fragrances for those who understand that a signature scent
               is the most intimate expression of self. Available in 35ml, 50ml,
@@ -467,7 +467,7 @@ export default function HomePage() {
           </div>
 
           {/* Feature pills */}
-          <div className="flex flex-wrap gap-6 mt-16 animate-fade-in-up anim-delay-500">
+          <div className="flex flex-wrap gap-4 mt-8 md:mt-16 animate-fade-in-up anim-delay-500">
             {[
               { label: 'Multiple Sizes', sub: '35ml · 50ml · 100ml' },
               { label: 'Bulk Discounts', sub: 'For resellers & wholesale' },
@@ -494,23 +494,23 @@ export default function HomePage() {
       {/* ─── New Arrivals ─────────────────────────────────────────────────── */}
       {newArrivals.length > 0 && (
         <section
-          className="py-24"
+          className="py-12 md:py-24"
           style={{ background: 'var(--bg-alt)' }}
           id="new-arrivals"
         >
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="mb-16">
+            <div className="mb-8 md:mb-16">
               <p className="section-label mb-4">Just Arrived</p>
               <h3
-                className="font-display text-5xl"
-                style={{ color: 'var(--text)', fontWeight: 300 }}
+                className="font-display text-3xl sm:text-5xl"
+                style={{ color: 'var(--text)', fontWeight: 400 }}
               >
                 New Fragrances
               </h3>
               <div className="gold-line-left mt-4" />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 md:gap-8">
               {newArrivals.map((product, i) =>
                 <ProductCard
                   key={product.id}
@@ -534,13 +534,13 @@ export default function HomePage() {
       )}
 
       {/* ─── Main Collection ──────────────────────────────────────────────── */}
-      <section className="py-24" id="collection" style={{ background: 'var(--bg)' }}>
+      <section className="py-12 md:py-24" id="collection" style={{ background: 'var(--bg)' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="mb-16">
+          <div className="mb-8 md:mb-16">
             <p className="section-label mb-4">Our Range</p>
             <h3
-              className="font-display text-5xl"
-              style={{ color: 'var(--text)', fontWeight: 300 }}
+              className="font-display text-3xl sm:text-5xl"
+              style={{ color: 'var(--text)', fontWeight: 400 }}
             >
               The Collection
             </h3>
@@ -557,7 +557,7 @@ export default function HomePage() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 md:gap-8">
               {products.map((product, i) =>
                 <ProductCard
                   key={product.id}
@@ -580,14 +580,14 @@ export default function HomePage() {
       </section>
 
       {/* ─── Brand Story ─────────────────────────────────────────────────── */}
-      <section className="py-24" style={{ background: 'var(--bg-alt)' }}>
+      <section className="py-12 md:py-24" style={{ background: 'var(--bg-alt)' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 md:gap-16 items-center">
             <div>
               <p className="section-label mb-6">Our Philosophy</p>
               <h3
-                className="font-display text-5xl mb-6"
-                style={{ color: 'var(--text)', fontWeight: 300, lineHeight: 1.1 }}
+                className="font-display text-3xl sm:text-5xl mb-4 md:mb-6"
+                style={{ color: 'var(--text)', fontWeight: 400, lineHeight: 1.1 }}
               >
                 Scent is the
                 <br />
@@ -598,7 +598,7 @@ export default function HomePage() {
               <div className="gold-line-left mb-8" />
               <p
                 className="text-base leading-relaxed mb-6"
-                style={{ color: 'var(--text-muted)', fontWeight: 300 }}
+                style={{ color: 'var(--text-muted)', fontWeight: 400 }}
               >
                 At Aromatic Scents, we believe perfume is not merely a product — it is
                 an invisible signature, a memory, an identity. Every fragrance in our
@@ -607,7 +607,7 @@ export default function HomePage() {
               </p>
               <p
                 className="text-base leading-relaxed mb-10"
-                style={{ color: 'var(--text-muted)', fontWeight: 300 }}
+                style={{ color: 'var(--text-muted)', fontWeight: 400 }}
               >
                 From the bergamot-kissed opening of Midnight Elegance to the warm,
                 vanilla-drenched dry-down of Golden Sunset — each bottle is an invitation
@@ -684,13 +684,13 @@ export default function HomePage() {
       </section>
 
       {/* ─── Testimonials ────────────────────────────────────────────────── */}
-      <section className="py-24" style={{ background: 'var(--bg)' }}>
+      <section className="py-12 md:py-24" style={{ background: 'var(--bg)' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
+          <div className="text-center mb-8 md:mb-16">
             <p className="section-label mb-4">Client Stories</p>
             <h3
-              className="font-display text-5xl"
-              style={{ color: 'var(--text)', fontWeight: 300 }}
+              className="font-display text-3xl sm:text-5xl"
+              style={{ color: 'var(--text)', fontWeight: 400 }}
             >
               What Our Clients Say
             </h3>
@@ -707,7 +707,7 @@ export default function HomePage() {
                 </div>
                 <p
                   className="text-sm leading-relaxed mb-6"
-                  style={{ color: 'var(--text-muted)', fontWeight: 300 }}
+                  style={{ color: 'var(--text-muted)', fontWeight: 400 }}
                 >
                   {t.text}
                 </p>
@@ -725,7 +725,7 @@ export default function HomePage() {
 
       {/* ─── Footer ──────────────────────────────────────────────────────── */}
       <footer style={{ background: 'var(--footer-bg)' }}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-20">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
             {/* Brand */}
             <div className="lg:col-span-2">
@@ -733,9 +733,9 @@ export default function HomePage() {
                 <div className="w-8 h-8 flex items-center justify-center" style={{ background: 'var(--gold)' }}>
                   <span className="font-display text-white" style={{ fontWeight: 400 }}>A</span>
                 </div>
-                <h3 className="font-display text-2xl text-white" style={{ fontWeight: 300 }}>Aromatic Scents</h3>
+                <h3 className="font-display text-2xl text-white" style={{ fontWeight: 400 }}>Aromatic Scents</h3>
               </div>
-              <p className="text-sm leading-relaxed mb-8 max-w-sm" style={{ color: 'var(--footer-text)', fontWeight: 300 }}>
+              <p className="text-sm leading-relaxed mb-8 max-w-sm" style={{ color: 'var(--footer-text)', fontWeight: 400 }}>
                 Curated fragrances for the discerning individual. We bring the world&apos;s
                 finest scents to South Africa — elegantly packaged, affordably priced.
               </p>
@@ -780,7 +780,7 @@ export default function HomePage() {
                     <a
                       href="#"
                       className="text-sm transition-colors duration-200"
-                      style={{ color: 'var(--footer-text)', fontWeight: 300 }}
+                      style={{ color: 'var(--footer-text)', fontWeight: 400 }}
                       onMouseEnter={e => (e.currentTarget as HTMLAnchorElement).style.color = 'var(--gold)'}
                       onMouseLeave={e => (e.currentTarget as HTMLAnchorElement).style.color = 'var(--footer-text)'}
                     >
@@ -809,7 +809,7 @@ export default function HomePage() {
                     <Icon className="h-4 w-4 flex-shrink-0 mt-0.5" style={{ color: 'var(--gold)' }} />
                     <span
                       className="text-sm whitespace-pre-line"
-                      style={{ color: 'var(--footer-text)', fontWeight: 300 }}
+                      style={{ color: 'var(--footer-text)', fontWeight: 400 }}
                     >
                       {text}
                     </span>
@@ -1211,7 +1211,7 @@ function ProductCard({
       style={{ animationDelay: `${delay}ms` }}
     >
       {/* ── Image ── */}
-      <div className="relative aspect-[3/4] overflow-hidden">
+      <div className="relative aspect-square sm:aspect-[3/4] overflow-hidden">
         <Image
           src={product.image_url}
           alt={product.name}
@@ -1295,27 +1295,27 @@ function ProductCard({
       </div>
 
       {/* ── Card Body ── */}
-      <div className="flex flex-col flex-1 p-6">
+      <div className="flex flex-col flex-1 p-3 sm:p-6">
         <h3
-          className="font-display text-2xl mb-1"
-          style={{ color: 'var(--text)', fontWeight: 300, lineHeight: 1.2 }}
+          className="font-display text-base sm:text-2xl mb-1"
+          style={{ color: 'var(--text)', fontWeight: 500, lineHeight: 1.2 }}
         >
           {product.name}
         </h3>
         <div className="gold-line-left my-3" style={{ width: '2rem' }} />
         <p
-          className="text-xs leading-relaxed mb-5 line-clamp-2 flex-1"
-          style={{ color: 'var(--text-muted)', fontWeight: 300 }}
+          className="text-xs leading-relaxed mb-3 sm:mb-5 line-clamp-2 flex-1"
+          style={{ color: 'var(--text-muted)', fontWeight: 400 }}
         >
           {product.description}
         </p>
 
         {/* Size selector */}
-        <div className="mb-5">
+        <div className="mb-3 sm:mb-5">
           <p className="text-xs mb-2" style={{ color: 'var(--text-faint)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
             Size
           </p>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1 sm:gap-2">
             {product.product_variants
               .sort((a, b) => a.size_ml - b.size_ml)
               .map(variant => (
@@ -1333,11 +1333,11 @@ function ProductCard({
 
         {/* Price */}
         {selectedVariant && effectivePrice && (
-          <div className="mb-5">
-            <div className="flex items-baseline gap-2">
+          <div className="mb-3 sm:mb-5">
+            <div className="flex items-baseline gap-1 sm:gap-2">
               <span
-                className="font-display text-3xl"
-                style={{ color: 'var(--gold)', fontWeight: 400 }}
+                className="font-display text-xl sm:text-3xl"
+                style={{ color: 'var(--gold)', fontWeight: 600 }}
               >
                 R{effectivePrice.price.toFixed(2)}
               </span>

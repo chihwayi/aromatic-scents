@@ -26,8 +26,8 @@
   --border: rgba(201, 168, 76, 0.2);
   --border-strong: rgba(201, 168, 76, 0.4);
   --text: #1C1C1E;
-  --text-muted: #6B6B6B;
-  --text-faint: #9B9B9B;
+  --text-muted: #4A4A4A;
+  --text-faint: #787878;
   --accent: #9D174D;
   --accent-light: #FCE7F3;
   --accent-hover: #831843;
@@ -47,8 +47,8 @@
   --border: rgba(201, 168, 76, 0.15);
   --border-strong: rgba(201, 168, 76, 0.35);
   --text: #F5F0E8;
-  --text-muted: #A0978A;
-  --text-faint: #6B6259;
+  --text-muted: #C4BAB0;
+  --text-faint: #908880;
   --accent: #C9A84C;
   --accent-light: rgba(201, 168, 76, 0.1);
   --accent-hover: #E8D5A3;
@@ -304,6 +304,24 @@
   letter-spacing: 0.18em;
   text-transform: uppercase;
   font-weight: 500;
+}
+
+/* ─── Mobile overrides ──────────────────────────────────────── */
+@media (max-width: 639px) {
+  .size-btn {
+    font-size: 0.6rem;
+    padding: 0.25rem 0.5rem;
+    letter-spacing: 0.04em;
+  }
+  .btn-gold, .btn-outline-gold {
+    padding: 0.6rem 0.75rem;
+    font-size: 0.6rem;
+    letter-spacing: 0.08em;
+  }
+  .announcement-bar {
+    font-size: 0.6rem;
+    letter-spacing: 0.1em;
+  }
 }
 
 /* ─── Testimonial cards ─────────────────────────────────────── */
