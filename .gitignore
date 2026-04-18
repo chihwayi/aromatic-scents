@@ -48,3 +48,6 @@ superbase
 # database backups
 *.backup.gz
 *.backup
+live-api-key
+server
+deploy.sh

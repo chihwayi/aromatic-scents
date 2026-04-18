@@ -1,0 +1,8 @@
+RewriteEngine On
+
+# Serve existing files directly (static assets)
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^ - [L]
+
+# Proxy everything else to the Next.js app
+RewriteRule ^(.*)$ http://localhost:3001/$1 [P,L]
