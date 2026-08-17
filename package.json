@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "NODE_OPTIONS='--localstorage-file=/tmp/next-ls.json' next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "prisma migrate deploy && next start",
+    "postinstall": "prisma generate",
     "lint": "next lint"
   },
   "dependencies": {
