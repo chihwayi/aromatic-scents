@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { CheckCircle, Package } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
 
 interface Order {
   custom_payment_id: string
@@ -29,11 +28,8 @@ export default function SuccessClient() {
     if (!orderId) { setLoading(false); return }
 
     const fetchOrder = async () => {
-      const { data } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('custom_payment_id', orderId)
-        .maybeSingle()
+      const response = await fetch(`/api/orders?custom_payment_id=${encodeURIComponent(orderId)}`)
+      const data = response.ok ? await response.json() : null
 
       setOrder(data)
       setLoading(false)

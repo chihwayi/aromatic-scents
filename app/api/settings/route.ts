@@ -1,31 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { prisma } from '@/lib/prisma'
 
-// Define the setting type from your database
-interface Setting {
-    key: string
-    value: string
-    updated_at?: string
-}
-
-// Define the settings object type
 interface SettingsObject {
     [key: string]: string
 }
 
 export async function GET() {
     try {
-        const { data, error } = await supabase
-            .from('settings')
-            .select('*')
+        const rows = await prisma.setting.findMany()
 
-        if (error) throw error
-
-        // Convert to key-value object for easier use
-        const settings = data.reduce((acc: SettingsObject, setting: Setting) => {
+        const settings = rows.reduce((acc: SettingsObject, setting) => {
             acc[setting.key] = setting.value
             return acc
-        }, {} as SettingsObject)
+        }, {})
 
         return NextResponse.json(settings)
     } catch (error) {
@@ -41,19 +28,12 @@ export async function PUT(request: NextRequest) {
     try {
         const settings: SettingsObject = await request.json()
 
-        // Update each setting
         for (const [key, value] of Object.entries(settings)) {
-            const { error } = await supabase
-                .from('settings')
-                .upsert({
-                    key,
-                    value: value as string,
-                    updated_at: new Date().toISOString()
-                }, {
-                    onConflict: 'key'
-                })
-
-            if (error) throw error
+            await prisma.setting.upsert({
+                where: { key },
+                update: { value },
+                create: { key, value },
+            })
         }
 
         return NextResponse.json({ success: true })

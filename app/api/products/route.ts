@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { prisma } from '@/lib/prisma'
+import type { Product, ProductVariant } from '@prisma/client'
 
 // Define types for the request data
-interface ProductVariant {
+interface ProductVariantInput {
   size_ml: number
   regular_price: number
   bulk_price?: number
@@ -10,7 +11,7 @@ interface ProductVariant {
   stock_quantity: number
 }
 
-interface Product {
+interface ProductInput {
   name: string
   description: string
   image_url: string
@@ -18,36 +19,45 @@ interface Product {
 }
 
 interface CreateProductRequest {
-  product: Product
-  variants: ProductVariant[]
+  product: ProductInput
+  variants: ProductVariantInput[]
 }
 
 interface UpdateProductRequest {
   id: string
-  product: Product
-  variants: ProductVariant[]
+  product: ProductInput
+  variants: ProductVariantInput[]
+}
+
+function toProductDTO(product: Product & { variants: ProductVariant[] }) {
+  return {
+    id:             product.id,
+    name:           product.name,
+    description:    product.description,
+    image_url:      product.imageUrl,
+    is_new_arrival: product.isNewArrival,
+    fragrance_notes: product.fragranceNotes ? JSON.parse(product.fragranceNotes) : null,
+    created_at:     product.createdAt.toISOString(),
+    updated_at:     product.updatedAt.toISOString(),
+    product_variants: product.variants.map(v => ({
+      id:                v.id,
+      size_ml:           v.sizeMl,
+      regular_price:     v.regularPrice,
+      bulk_price:        v.bulkPrice,
+      bulk_min_quantity: v.bulkMinQuantity,
+      stock_quantity:    v.stockQuantity,
+    })),
+  }
 }
 
 export async function GET() {
   try {
-    const { data, error } = await supabase
-      .from('products')
-      .select(`
-        *,
-        product_variants (
-          id,
-          size_ml,
-          regular_price,
-          bulk_price,
-          bulk_min_quantity,
-          stock_quantity
-        )
-      `)
-      .order('created_at', { ascending: false })
+    const products = await prisma.product.findMany({
+      include: { variants: true },
+      orderBy: { createdAt: 'desc' },
+    })
 
-    if (error) throw error
-
-    return NextResponse.json(data)
+    return NextResponse.json(products.map(toProductDTO))
   } catch (error) {
     console.error('Error fetching products:', error)
     return NextResponse.json(
@@ -61,59 +71,26 @@ export async function POST(request: NextRequest) {
   try {
     const { product, variants }: CreateProductRequest = await request.json()
 
-    // Insert product first
-    const { data: productData, error: productError } = await supabase
-      .from('products')
-      .insert([{
-        name: product.name,
-        description: product.description,
-        image_url: product.image_url,
-        is_new_arrival: product.is_new_arrival || false
-      }])
-      .select()
+    const created = await prisma.product.create({
+      data: {
+        name:         product.name,
+        description:  product.description,
+        imageUrl:     product.image_url,
+        isNewArrival: product.is_new_arrival || false,
+        variants: {
+          create: (variants || []).map(v => ({
+            sizeMl:          v.size_ml,
+            regularPrice:    v.regular_price,
+            bulkPrice:       v.bulk_price,
+            bulkMinQuantity: v.bulk_min_quantity ?? 6,
+            stockQuantity:   v.stock_quantity,
+          })),
+        },
+      },
+      include: { variants: true },
+    })
 
-    if (productError) throw productError
-
-    const productId = productData[0].id
-
-    // Insert variants
-    if (variants && variants.length > 0) {
-      const variantInserts = variants.map((variant: ProductVariant) => ({
-        product_id: productId,
-        size_ml: variant.size_ml,
-        regular_price: variant.regular_price,
-        bulk_price: variant.bulk_price,
-        bulk_min_quantity: variant.bulk_min_quantity,
-        stock_quantity: variant.stock_quantity
-      }))
-
-      const { error: variantError } = await supabase
-        .from('product_variants')
-        .insert(variantInserts)
-
-      if (variantError) throw variantError
-    }
-
-    // Fetch the complete product with variants
-    const { data: completeProduct, error: fetchError } = await supabase
-      .from('products')
-      .select(`
-        *,
-        product_variants (
-          id,
-          size_ml,
-          regular_price,
-          bulk_price,
-          bulk_min_quantity,
-          stock_quantity
-        )
-      `)
-      .eq('id', productId)
-      .single()
-
-    if (fetchError) throw fetchError
-
-    return NextResponse.json(completeProduct)
+    return NextResponse.json(toProductDTO(created))
   } catch (error) {
     console.error('Error creating product:', error)
     return NextResponse.json(
@@ -127,66 +104,36 @@ export async function PUT(request: NextRequest) {
   try {
     const { id, product, variants }: UpdateProductRequest = await request.json()
 
-    // Update product
-    const { error: productError } = await supabase
-      .from('products')
-      .update({
-        name: product.name,
-        description: product.description,
-        image_url: product.image_url,
-        is_new_arrival: product.is_new_arrival || false,
-        updated_at: new Date().toISOString()
+    const updated = await prisma.$transaction(async (tx) => {
+      await tx.product.update({
+        where: { id },
+        data: {
+          name:         product.name,
+          description:  product.description,
+          imageUrl:     product.image_url,
+          isNewArrival: product.is_new_arrival || false,
+        },
       })
-      .eq('id', id)
 
-    if (productError) throw productError
+      await tx.productVariant.deleteMany({ where: { productId: id } })
 
-    // Delete existing variants
-    const { error: deleteError } = await supabase
-      .from('product_variants')
-      .delete()
-      .eq('product_id', id)
+      for (const v of variants || []) {
+        await tx.productVariant.create({
+          data: {
+            productId:       id,
+            sizeMl:          v.size_ml,
+            regularPrice:    v.regular_price,
+            bulkPrice:       v.bulk_price,
+            bulkMinQuantity: v.bulk_min_quantity ?? 6,
+            stockQuantity:   v.stock_quantity,
+          },
+        })
+      }
 
-    if (deleteError) throw deleteError
+      return tx.product.findUniqueOrThrow({ where: { id }, include: { variants: true } })
+    })
 
-    // Insert new variants
-    if (variants && variants.length > 0) {
-      const variantInserts = variants.map((variant: ProductVariant) => ({
-        product_id: id,
-        size_ml: variant.size_ml,
-        regular_price: variant.regular_price,
-        bulk_price: variant.bulk_price,
-        bulk_min_quantity: variant.bulk_min_quantity,
-        stock_quantity: variant.stock_quantity
-      }))
-
-      const { error: variantError } = await supabase
-        .from('product_variants')
-        .insert(variantInserts)
-
-      if (variantError) throw variantError
-    }
-
-    // Fetch the updated product with variants
-    const { data: updatedProduct, error: fetchError } = await supabase
-      .from('products')
-      .select(`
-        *,
-        product_variants (
-          id,
-          size_ml,
-          regular_price,
-          bulk_price,
-          bulk_min_quantity,
-          stock_quantity
-        )
-      `)
-      .eq('id', id)
-      .single()
-
-    if (fetchError) throw fetchError
-
-    return NextResponse.json(updatedProduct)
+    return NextResponse.json(toProductDTO(updated))
   } catch (error) {
     console.error('Error updating product:', error)
     return NextResponse.json(
@@ -208,13 +155,8 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    // Delete product (variants will be deleted automatically due to cascade)
-    const { error } = await supabase
-      .from('products')
-      .delete()
-      .eq('id', id)
-
-    if (error) throw error
+    // Variants are deleted automatically via onDelete: Cascade
+    await prisma.product.delete({ where: { id } })
 
     return NextResponse.json({ success: true })
   } catch (error) {

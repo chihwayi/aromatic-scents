@@ -6,7 +6,6 @@ import {
   Mail, Phone, MapPin, Heart, Star, X, Sun, Moon, ChevronLeft,
   Loader2
 } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
 import Image from 'next/image'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -127,12 +126,9 @@ export default function HomePage() {
 
   const fetchProducts = async () => {
     try {
-      const { data, error } = await supabase
-        .from('products')
-        .select(`*, product_variants (id, size_ml, regular_price, bulk_price, bulk_min_quantity, stock_quantity)`)
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
+      const response = await fetch('/api/products')
+      if (!response.ok) throw new Error('Failed to fetch products')
+      const data: Product[] = await response.json()
 
       const withStock = (data || []).filter(p =>
         p.product_variants.some((v: ProductVariant) => v.stock_quantity > 0)
@@ -158,13 +154,10 @@ export default function HomePage() {
 
   const fetchSettings = async () => {
     try {
-      const { data, error } = await supabase.from('settings').select('*')
-      if (error) throw error
-      const obj = (data || []).reduce((acc: Settings, s: { key: string; value: string }) => {
-        acc[s.key as keyof Settings] = s.value
-        return acc
-      }, {} as Settings)
-      setSettings(obj)
+      const response = await fetch('/api/settings')
+      if (!response.ok) throw new Error('Failed to fetch settings')
+      const data: Settings = await response.json()
+      setSettings(data)
     } catch (e) {
       console.error('Error fetching settings:', e)
     }

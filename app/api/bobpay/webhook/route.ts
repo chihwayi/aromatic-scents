@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { prisma } from '@/lib/prisma'
 import {
   BOBPAY_CONFIG,
   verifyWebhookSignature,
@@ -39,12 +39,10 @@ export async function POST(request: NextRequest) {
     }
 
     // ─── 3. Idempotency — check if already processed ──────────────────────
-    const { data: existingLog } = await supabase
-      .from('webhook_logs')
-      .select('id, processed')
-      .eq('event_id', payload.uuid)
-      .eq('processed', true)
-      .maybeSingle()
+    const existingLog = await prisma.webhookLog.findFirst({
+      where: { eventId: payload.uuid, processed: true },
+      select: { id: true },
+    })
 
     if (existingLog) {
       // Already processed — return 200 to prevent BobPay retries
@@ -60,11 +58,10 @@ export async function POST(request: NextRequest) {
     }
 
     // ─── 5. Verify amount matches our order ───────────────────────────────
-    const { data: order } = await supabase
-      .from('orders')
-      .select('id, total_amount, status')
-      .eq('custom_payment_id', payload.custom_payment_id)
-      .maybeSingle()
+    const order = await prisma.order.findUnique({
+      where: { customPaymentId: payload.custom_payment_id },
+      select: { id: true, totalAmount: true, status: true },
+    })
 
     if (!order) {
       await logWebhook(payload, clientIp, ipValid, signatureValid, 'Order not found')
@@ -73,44 +70,44 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify amount (allow ±1 cent tolerance for floating point)
-    const expectedAmount = parseFloat(order.total_amount.toString())
+    const expectedAmount = order.totalAmount
     const amountMatch = Math.abs(payload.paid_amount - expectedAmount) < 0.02
 
-    // ─── 6. Update order status in Supabase ──────────────────────────────
-    const { error: updateError } = await supabase
-      .from('orders')
-      .update({
-        status:               payload.status,
-        bobpay_uuid:          payload.uuid,
-        bobpay_short_ref:     payload.short_reference,
-        bobpay_payment_id:    payload.payment_id,
-        paid_amount:          payload.paid_amount,
-        payment_method:       payload.payment_method,
-        from_bank:            payload.from_bank || null,
-        is_test:              payload.is_test,
-        webhook_payload:      payload,
-        webhook_received_at:  new Date().toISOString(),
-      })
-      .eq('custom_payment_id', payload.custom_payment_id)
+    // ─── 6. Update order + log webhook (atomic) ───────────────────────────
+    await prisma.$transaction([
+      prisma.order.update({
+        where: { customPaymentId: payload.custom_payment_id },
+        data: {
+          status:            payload.status,
+          bobpayUuid:        payload.uuid,
+          bobpayShortRef:    payload.short_reference,
+          bobpayPaymentId:   String(payload.payment_id),
+          paidAmount:        payload.paid_amount,
+          paymentMethod:     payload.payment_method,
+          fromBank:          payload.from_bank || null,
+          isTest:            payload.is_test,
+          webhookPayload:    JSON.stringify(payload),
+          webhookReceivedAt: new Date(),
+        },
+      }),
+      prisma.webhookLog.create({
+        data: {
+          source:         'bobpay',
+          eventId:        payload.uuid || null,
+          orderId:        order.id,
+          status:         payload.status || null,
+          payload:        JSON.stringify(payload),
+          ipAddress:      clientIp,
+          signatureValid: signatureValid,
+          processed:      true,
+          error:          amountMatch ? null : `Amount mismatch: expected ${expectedAmount}, got ${payload.paid_amount}`,
+        },
+      }),
+    ])
 
-    if (updateError) {
-      console.error('Failed to update order:', updateError)
-    }
-
-    // ─── 7. Log the webhook ───────────────────────────────────────────────
-    await logWebhook(
-      payload,
-      clientIp,
-      ipValid,
-      signatureValid,
-      amountMatch ? null : `Amount mismatch: expected ${expectedAmount}, got ${payload.paid_amount}`,
-      order.id,
-      true
-    )
-
-    // ─── 8. Post-payment actions (stock reduction, notifications, etc.) ───
+    // ─── 7. Post-payment actions (stock reduction) ─────────────────────────
     if (payload.status === 'paid' && amountMatch) {
-      await handleSuccessfulPayment(payload, order.id)
+      await handleSuccessfulPayment(order.id)
     }
 
     // ─── Always return 200 to acknowledge receipt ─────────────────────────
@@ -118,7 +115,6 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Webhook processing error:', error)
 
-    // Log the error if we have payload
     if (payload) {
       await logWebhook(payload, '', false, false, `Exception: ${error}`)
     }
@@ -129,39 +125,30 @@ export async function POST(request: NextRequest) {
 }
 
 // ─── Handle Successful Payment ────────────────────────────────────────────────
-async function handleSuccessfulPayment(
-  payload: BobPayWebhookPayload,
-  orderId: string
-) {
+async function handleSuccessfulPayment(orderId: string) {
   try {
-    // Fetch the order items to reduce stock
-    const { data: order } = await supabase
-      .from('orders')
-      .select('items')
-      .eq('id', orderId)
-      .single()
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: { items: true },
+    })
 
     if (!order?.items) return
 
-    const items = order.items as Array<{
-      variantId: string
-      quantity: number
-    }>
+    let items: Array<{ variantId: string; quantity: number }> = []
+    try {
+      const parsed = JSON.parse(order.items)
+      items = Array.isArray(parsed) ? parsed : []
+    } catch {
+      items = []
+    }
 
-    // Reduce stock for each ordered variant
     for (const item of items) {
-      const { data: variant } = await supabase
-        .from('product_variants')
-        .select('stock_quantity')
-        .eq('id', item.variantId)
-        .single()
-
+      const variant = await prisma.productVariant.findUnique({ where: { id: item.variantId } })
       if (variant) {
-        const newStock = Math.max(0, variant.stock_quantity - item.quantity)
-        await supabase
-          .from('product_variants')
-          .update({ stock_quantity: newStock })
-          .eq('id', item.variantId)
+        await prisma.productVariant.update({
+          where: { id: item.variantId },
+          data: { stockQuantity: Math.max(0, variant.stockQuantity - item.quantity) },
+        })
       }
     }
   } catch (error) {
@@ -180,16 +167,18 @@ async function logWebhook(
   processed = false
 ) {
   try {
-    await supabase.from('webhook_logs').insert({
-      source:          'bobpay',
-      event_id:        payload.uuid || null,
-      order_id:        orderId || null,
-      status:          payload.status || null,
-      payload:         payload,
-      ip_address:      ip,
-      signature_valid: sigValid,
-      processed:       processed,
-      error:           error,
+    await prisma.webhookLog.create({
+      data: {
+        source:         'bobpay',
+        eventId:        payload.uuid || null,
+        orderId:        orderId || null,
+        status:         payload.status || null,
+        payload:        JSON.stringify(payload),
+        ipAddress:      ip,
+        signatureValid: sigValid,
+        processed:      processed,
+        error:          error,
+      },
     })
   } catch (e) {
     console.error('Failed to log webhook:', e)

@@ -2,9 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession, signOut } from 'next-auth/react'
 import { Plus, Edit, Trash2, Save, X, LogOut, User, Package, DollarSign, TrendingUp, Settings, ShoppingCart, CheckCircle2, BarChart3, Truck } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
-import type { User as SupabaseUser } from '@supabase/supabase-js'
 import Link from 'next/link'
 import Image from 'next/image'
 
@@ -70,7 +69,7 @@ export default function AdminPanel() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [isAddingNew, setIsAddingNew] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [user, setUser] = useState<SupabaseUser | null>(null)
+  const { data: session } = useSession()
   const [showSettings, setShowSettings] = useState(false)
   const [settings, setSettings] = useState<AppSettings>({
     delivery_cost: '50.00',
@@ -132,19 +131,10 @@ export default function AdminPanel() {
 
   const fetchOrderStats = useCallback(async () => {
     try {
-      const { data, error } = await supabase.from('order_stats').select('*').maybeSingle()
-      if (!error && data) {
-        setOrderStats({
-          total_orders: data.total_orders || 0,
-          paid_orders: data.paid_orders || 0,
-          pending_orders: data.pending_orders || 0,
-          failed_orders: data.failed_orders || 0,
-          cancelled_orders: data.cancelled_orders || 0,
-          total_revenue: parseFloat(data.total_revenue) || 0,
-          avg_order_value: parseFloat(data.avg_order_value) || 0,
-          total_delivery_collected: parseFloat(data.total_delivery_collected) || 0,
-          revenue_last_30_days: parseFloat(data.revenue_last_30_days) || 0,
-        })
+      const response = await fetch('/api/orders?stats=1')
+      if (response.ok) {
+        const data = await response.json()
+        setOrderStats(data)
       }
     } catch (error) {
       console.error('Error fetching order stats:', error)
@@ -153,12 +143,9 @@ export default function AdminPanel() {
 
   const fetchRecentOrders = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from('orders')
-        .select('id, custom_payment_id, customer_email, total_amount, paid_amount, status, payment_method, include_delivery, delivery_cost, items, is_test, created_at')
-        .order('created_at', { ascending: false })
-        .limit(25)
-      if (!error && data) {
+      const response = await fetch('/api/orders?limit=25')
+      if (response.ok) {
+        const data = await response.json()
         setRecentOrders(data as RecentOrder[])
       }
     } catch (error) {
@@ -195,41 +182,15 @@ export default function AdminPanel() {
     }
   }, [calculateStats])
 
-  const checkAuth = useCallback(async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-
-      if (!session) {
-        router.push('/admin/login')
-        return
-      }
-
-      const adminEmails = ['admin@aromaticscents.co.za', 'info@aromaticscents.co.za']
-      if (!adminEmails.includes(session.user.email || '')) {
-        await supabase.auth.signOut()
-        router.push('/admin/login')
-        return
-      }
-
-      setUser(session.user)
-      await Promise.all([fetchProducts(), fetchSettings(), fetchOrderStats(), fetchRecentOrders()])
-    } catch (error) {
-      console.error('Auth check failed:', error)
-      router.push('/admin/login')
-    }
-  }, [router, fetchProducts, fetchSettings, fetchOrderStats, fetchRecentOrders])
-
   useEffect(() => {
-    checkAuth()
-  }, [checkAuth])
+    // Auth is enforced by middleware — by the time this component renders
+    // the request has already been redirected to /admin/login if unauthenticated.
+    Promise.all([fetchProducts(), fetchSettings(), fetchOrderStats(), fetchRecentOrders()])
+  }, [fetchProducts, fetchSettings, fetchOrderStats, fetchRecentOrders])
 
   const handleSignOut = async () => {
-    try {
-      await supabase.auth.signOut()
-      router.push('/admin/login')
-    } catch (error) {
-      console.error('Sign out failed:', error)
-    }
+    await signOut({ redirect: false })
+    router.push('/admin/login')
   }
 
   const saveProduct = async (product: Product) => {
@@ -569,7 +530,7 @@ export default function AdminPanel() {
               </button>
               <div className="flex items-center space-x-3 text-sm text-gray-600">
                 <User className="h-4 w-4" />
-                <span>{user?.email}</span>
+                <span>{session?.user?.email}</span>
               </div>
               <Link href="/" className="text-rose-600 hover:text-rose-700 font-medium transition-colors duration-300">
                 View Store

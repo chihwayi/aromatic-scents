@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { prisma } from '@/lib/prisma'
 import {
   BOBPAY_CONFIG,
   createPaymentLink,
@@ -42,12 +42,8 @@ export async function POST(request: NextRequest) {
     // ─── Fetch delivery cost from settings ────────────────────────────────
     let deliveryCost = 0
     if (includeDelivery) {
-      const { data: settings } = await supabase
-        .from('settings')
-        .select('value')
-        .eq('key', 'delivery_cost')
-        .single()
-      deliveryCost = settings ? parseFloat(settings.value) : 50
+      const setting = await prisma.setting.findUnique({ where: { key: 'delivery_cost' } })
+      deliveryCost = setting ? parseFloat(setting.value) : 50
     }
 
     // ─── Calculate totals ─────────────────────────────────────────────────
@@ -71,24 +67,26 @@ export async function POST(request: NextRequest) {
     const pendingUrl = `${baseUrl}/pending?order_id=${customPaymentId}`
     const cancelUrl  = `${baseUrl}?payment=cancelled`
 
-    // ─── Save order to Supabase (status: pending) ─────────────────────────
-    const { error: dbError } = await supabase.from('orders').insert({
-      custom_payment_id: customPaymentId,
-      customer_email:    customerEmail,
-      customer_phone:    customerPhone || null,
-      customer_type:     customerType,
-      items:             items,
-      subtotal:          subtotal,
-      delivery_cost:     deliveryCost,
-      total_amount:      total,
-      currency:          'ZAR',
-      status:            'pending',
-      include_delivery:  includeDelivery,
-      is_test:           BOBPAY_CONFIG.isSandbox,
-    })
-
-    if (dbError) {
-      console.error('Failed to save order to Supabase:', dbError)
+    // ─── Save order (status: pending) ─────────────────────────────────────
+    try {
+      await prisma.order.create({
+        data: {
+          customPaymentId,
+          customerEmail:   customerEmail,
+          customerPhone:   customerPhone || null,
+          customerType:    customerType,
+          items:           JSON.stringify(items),
+          subtotal,
+          deliveryCost,
+          totalAmount:     total,
+          currency:        'ZAR',
+          status:          'pending',
+          includeDelivery: includeDelivery,
+          isTest:          BOBPAY_CONFIG.isSandbox,
+        },
+      })
+    } catch (dbError) {
+      console.error('Failed to save order:', dbError)
       // Non-fatal — continue with payment even if DB write fails
       // In production you may want to make this fatal
     }

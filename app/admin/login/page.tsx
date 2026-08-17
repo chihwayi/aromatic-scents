@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { signIn } from 'next-auth/react'
 import Link from 'next/link'
 
 export default function LoginPage() {
@@ -18,24 +18,17 @@ export default function LoginPage() {
         setError(null)
 
         try {
-            const { error } = await supabase.auth.signInWithPassword({
+            const result = await signIn('credentials', {
                 email,
                 password,
+                redirect: false,
             })
 
-            if (error) {
-                setError(error.message)
+            if (result?.error) {
+                setError('Invalid email or password.')
             } else {
-                // Check if the authenticated user is an admin
-                const adminEmails = ['admin@aromaticscents.co.za', 'info@aromaticscents.co.za']
-                const { data: { user } } = await supabase.auth.getUser()
-
-                if (user && adminEmails.includes(user.email || '')) {
-                    router.push('/admin') // Redirect to admin page
-                } else {
-                    setError('You are not authorized to access the admin panel.')
-                    await supabase.auth.signOut() // Sign out non-admin users
-                }
+                router.push('/admin')
+                router.refresh()
             }
         } catch (err: unknown) {
             if (err instanceof Error) {

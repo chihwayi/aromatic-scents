@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
 import { Inter, Cormorant_Garamond } from 'next/font/google'
+import Providers from './providers'
 import './globals.css'
 
 const inter = Inter({
@@ -30,7 +31,7 @@ export default function RootLayout({
   return (
     <html lang="en" data-theme="rose">
       <body className={`${inter.variable} ${cormorant.variable} font-sans`}>
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   )

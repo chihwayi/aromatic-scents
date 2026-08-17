@@ -51,3 +51,7 @@ superbase
 live-api-key
 server
 deploy.sh
+
+# local SQLite database (contains real customer data — never commit)
+prisma/*.db
+prisma/*.db-journal

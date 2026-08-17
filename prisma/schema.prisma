@@ -1,0 +1,88 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Product {
+  id            String   @id @default(uuid())
+  name          String
+  description   String
+  imageUrl      String
+  isNewArrival  Boolean  @default(false)
+  fragranceNotes String? // Stored as JSON string: { top, heart, base }
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  variants ProductVariant[]
+}
+
+model ProductVariant {
+  id               String   @id @default(uuid())
+  productId        String
+  product          Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sizeMl           Int
+  regularPrice     Float
+  bulkPrice        Float?
+  bulkMinQuantity  Int      @default(6)
+  stockQuantity    Int      @default(0)
+  createdAt        DateTime @default(now())
+}
+
+model Setting {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       String
+  description String?
+  updatedAt   DateTime @updatedAt
+}
+
+model Order {
+  id                String    @id @default(uuid())
+  customPaymentId   String    @unique
+  bobpayUuid        String?
+  bobpayShortRef    String?
+  bobpayPaymentId   String?
+
+  customerEmail     String
+  customerPhone     String?
+  customerType      String    @default("regular")
+
+  items             String    // Stored as JSON string
+
+  subtotal          Float     @default(0)
+  deliveryCost      Float     @default(0)
+  totalAmount       Float     @default(0)
+  paidAmount        Float?
+  currency          String    @default("ZAR")
+
+  status            String    @default("pending")
+  paymentMethod     String?
+  fromBank          String?
+  isTest            Boolean   @default(true)
+
+  includeDelivery   Boolean   @default(false)
+
+  webhookPayload    String?   // Stored as JSON string
+  webhookReceivedAt DateTime?
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+model WebhookLog {
+  id             String   @id @default(uuid())
+  source         String   @default("bobpay")
+  eventId        String?
+  orderId        String?
+  status         String?
+  payload        String   // Stored as JSON string
+  ipAddress      String?
+  signatureValid Boolean?
+  processed      Boolean  @default(false)
+  error          String?
+  createdAt      DateTime @default(now())
+}
