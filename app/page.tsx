@@ -7,6 +7,8 @@ import {
   Loader2
 } from 'lucide-react'
 import Image from 'next/image'
+import CurrencyToggle from '@/components/CurrencyToggle'
+import { useCurrency } from '@/context/CurrencyContext'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface ProductVariant {
@@ -68,6 +70,8 @@ const TESTIMONIALS = [
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function HomePage() {
+  const { formatPrice, currency } = useCurrency()
+
   // Data state
   const [products, setProducts]           = useState<Product[]>([])
   const [newArrivals, setNewArrivals]     = useState<Product[]>([])
@@ -345,6 +349,9 @@ export default function HomePage() {
               >
                 {customerType === 'reseller' ? '★ Reseller' : 'Regular'}
               </button>
+
+              {/* Currency */}
+              <CurrencyToggle />
 
               {/* Theme toggle */}
               <button
@@ -958,7 +965,7 @@ export default function HomePage() {
                               )}
                             </p>
                             <p className="text-sm font-medium mt-1" style={{ color: 'var(--gold)' }}>
-                              R{item.price.toFixed(2)}
+                              {formatPrice(item.price)}
                             </p>
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
@@ -1000,7 +1007,7 @@ export default function HomePage() {
                         className="w-4 h-4 accent-amber-500"
                       />
                       <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                        Include delivery (R{parseFloat(settings.delivery_cost || '0').toFixed(2)})
+                        Include delivery ({formatPrice(parseFloat(settings.delivery_cost || '0'))})
                       </span>
                     </label>
 
@@ -1008,12 +1015,12 @@ export default function HomePage() {
                     <div className="space-y-2 mb-4">
                       <div className="flex justify-between text-sm" style={{ color: 'var(--text-muted)' }}>
                         <span>Subtotal</span>
-                        <span>R{getSubtotal().toFixed(2)}</span>
+                        <span>{formatPrice(getSubtotal())}</span>
                       </div>
                       {includeDelivery && (
                         <div className="flex justify-between text-sm" style={{ color: 'var(--text-muted)' }}>
                           <span>Delivery</span>
-                          <span>R{getDeliveryCost().toFixed(2)}</span>
+                          <span>{formatPrice(getDeliveryCost())}</span>
                         </div>
                       )}
                       <div
@@ -1022,7 +1029,7 @@ export default function HomePage() {
                       >
                         <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>Total</span>
                         <span className="font-display text-2xl" style={{ color: 'var(--gold)', fontWeight: 400 }}>
-                          R{getTotalPrice().toFixed(2)}
+                          {formatPrice(getTotalPrice())}
                         </span>
                       </div>
                     </div>
@@ -1051,13 +1058,13 @@ export default function HomePage() {
                     {cart.map(item => (
                       <div key={item.variantId} className="flex justify-between text-sm mb-1" style={{ color: 'var(--text-muted)' }}>
                         <span>{item.name} {item.size}ml × {item.quantity}</span>
-                        <span>R{(item.price * item.quantity).toFixed(2)}</span>
+                        <span>{formatPrice(item.price * item.quantity)}</span>
                       </div>
                     ))}
                     {includeDelivery && (
                       <div className="flex justify-between text-sm" style={{ color: 'var(--text-muted)' }}>
                         <span>Delivery</span>
-                        <span>R{getDeliveryCost().toFixed(2)}</span>
+                        <span>{formatPrice(getDeliveryCost())}</span>
                       </div>
                     )}
                     <div
@@ -1066,9 +1073,14 @@ export default function HomePage() {
                     >
                       <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>Total</span>
                       <span className="font-display text-lg" style={{ color: 'var(--gold)', fontWeight: 400 }}>
-                        R{getTotalPrice().toFixed(2)}
+                        {formatPrice(getTotalPrice())}
                       </span>
                     </div>
+                    {currency === 'USD' && (
+                      <p className="text-xs mt-2" style={{ color: 'var(--text-faint)' }}>
+                        BobPay charges in ZAR — you&apos;ll be billed R{getTotalPrice().toFixed(2)}.
+                      </p>
+                    )}
                   </div>
 
                   {/* Customer details form */}
@@ -1148,7 +1160,7 @@ export default function HomePage() {
                         <span>Redirecting to BobPay...</span>
                       </>
                     ) : (
-                      <span>Pay with BobPay — R{getTotalPrice().toFixed(2)}</span>
+                      <span>Pay with BobPay — {formatPrice(getTotalPrice())}</span>
                     )}
                   </button>
                   <p className="text-xs text-center mt-3" style={{ color: 'var(--text-faint)' }}>
@@ -1192,6 +1204,7 @@ function ProductCard({
   isNew?: boolean
   delay?: number
 }) {
+  const { formatPrice }  = useCurrency()
   const selectedVariant  = getSelectedVariant(product)
   const effectivePrice   = selectedVariant ? getEffectivePrice(selectedVariant, 1) : null
   const isOutOfStock     = !selectedVariant || selectedVariant.stock_quantity === 0
@@ -1332,17 +1345,17 @@ function ProductCard({
                 className="font-display text-xl sm:text-3xl"
                 style={{ color: 'var(--gold)', fontWeight: 600 }}
               >
-                R{effectivePrice.price.toFixed(2)}
+                {formatPrice(effectivePrice.price)}
               </span>
               {effectivePrice.isBulkPrice && (
                 <span className="text-xs" style={{ color: 'var(--text-faint)', textDecoration: 'line-through' }}>
-                  R{selectedVariant.regular_price.toFixed(2)}
+                  {formatPrice(selectedVariant.regular_price)}
                 </span>
               )}
             </div>
             {customerType === 'reseller' && selectedVariant.bulk_price && !effectivePrice.isBulkPrice && (
               <p className="text-xs mt-1" style={{ color: 'var(--text-faint)' }}>
-                Bulk: R{selectedVariant.bulk_price.toFixed(2)} (min {selectedVariant.bulk_min_quantity})
+                Bulk: {formatPrice(selectedVariant.bulk_price)} (min {selectedVariant.bulk_min_quantity})
               </p>
             )}
           </div>
