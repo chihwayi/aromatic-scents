@@ -59,6 +59,8 @@ model Order {
   customerEmail     String
   customerPhone     String?
   customerType      String    @default("regular")
+  deliveryAddress   String?
+  courierOption     String?   // "courier_guy_locker" | "house_delivery"
 
   items             String    // Stored as JSON string
 

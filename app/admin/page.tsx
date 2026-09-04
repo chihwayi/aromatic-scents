@@ -48,6 +48,9 @@ interface RecentOrder {
   id: string
   custom_payment_id: string
   customer_email: string
+  customer_phone: string | null
+  delivery_address: string | null
+  courier_option: string | null
   total_amount: number
   paid_amount: number
   status: string
@@ -60,8 +63,14 @@ interface RecentOrder {
 }
 
 interface AppSettings {
-  delivery_cost: string
+  courier_locker_price: string
+  courier_house_price: string
   bulk_discount_enabled: string
+}
+
+const COURIER_LABELS: Record<string, string> = {
+  courier_guy_locker: 'Courier Guy Locker',
+  house_delivery: 'House Delivery',
 }
 
 export default function AdminPanel() {
@@ -72,7 +81,8 @@ export default function AdminPanel() {
   const { data: session } = useSession()
   const [showSettings, setShowSettings] = useState(false)
   const [settings, setSettings] = useState<AppSettings>({
-    delivery_cost: '50.00',
+    courier_locker_price: '80.00',
+    courier_house_price: '140.00',
     bulk_discount_enabled: 'true'
   })
   const [stats, setStats] = useState<AdminStats>({
@@ -471,13 +481,25 @@ export default function AdminPanel() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Delivery Cost (R)
+                Courier Guy Locker Price (R)
               </label>
               <input
                 type="number"
                 step="0.01"
-                value={formSettings.delivery_cost}
-                onChange={(e) => setFormSettings({ ...formSettings, delivery_cost: e.target.value })}
+                value={formSettings.courier_locker_price}
+                onChange={(e) => setFormSettings({ ...formSettings, courier_locker_price: e.target.value })}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                House Delivery Price (R)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                value={formSettings.courier_house_price}
+                onChange={(e) => setFormSettings({ ...formSettings, courier_house_price: e.target.value })}
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500"
               />
             </div>
@@ -869,6 +891,7 @@ export default function AdminPanel() {
                     <tr className="border-b border-gray-200 bg-gray-50/70">
                       <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Order Ref</th>
                       <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
+                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Delivery Details</th>
                       <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Items</th>
                       <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Subtotal</th>
                       <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Delivery</th>
@@ -890,6 +913,17 @@ export default function AdminPanel() {
                             </span>
                           </td>
                           <td className="px-6 py-4 text-gray-700 max-w-[180px] truncate">{order.customer_email}</td>
+                          <td className="px-6 py-4 max-w-[220px]">
+                            <div className="text-xs text-gray-600 space-y-0.5">
+                              <div>{order.customer_phone || <span className="text-gray-400">No phone</span>}</div>
+                              <div className="truncate" title={order.delivery_address || ''}>
+                                {order.delivery_address || <span className="text-gray-400">No address</span>}
+                              </div>
+                              {order.courier_option && (
+                                <div className="text-gray-400">{COURIER_LABELS[order.courier_option] || order.courier_option}</div>
+                              )}
+                            </div>
+                          </td>
                           <td className="px-6 py-4">
                             <div className="text-xs text-gray-600 space-y-0.5">
                               {order.items?.slice(0, 2).map((item, i) => (

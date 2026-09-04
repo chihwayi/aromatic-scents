@@ -5,6 +5,9 @@ function toOrderDTO(order: {
   id: string
   customPaymentId: string
   customerEmail: string
+  customerPhone: string | null
+  deliveryAddress: string | null
+  courierOption: string | null
   totalAmount: number
   paidAmount: number | null
   status: string
@@ -19,6 +22,9 @@ function toOrderDTO(order: {
     id:                order.id,
     custom_payment_id: order.customPaymentId,
     customer_email:    order.customerEmail,
+    customer_phone:    order.customerPhone,
+    delivery_address:  order.deliveryAddress,
+    courier_option:    order.courierOption,
     total_amount:      order.totalAmount,
     paid_amount:       order.paidAmount,
     status:            order.status,

@@ -42,8 +42,16 @@ interface CartItem {
 }
 
 interface Settings {
-  delivery_cost: string
+  courier_locker_price: string
+  courier_house_price: string
   bulk_discount_enabled: string
+}
+
+type CourierOption = '' | 'courier_guy_locker' | 'house_delivery'
+
+const COURIER_LABELS: Record<Exclude<CourierOption, ''>, string> = {
+  courier_guy_locker: 'Courier Guy Locker',
+  house_delivery: 'House Delivery',
 }
 
 // ─── Static testimonials ──────────────────────────────────────────────────────
@@ -76,7 +84,7 @@ export default function HomePage() {
   const [products, setProducts]           = useState<Product[]>([])
   const [newArrivals, setNewArrivals]     = useState<Product[]>([])
   const [loading, setLoading]             = useState(true)
-  const [settings, setSettings]           = useState<Settings>({ delivery_cost: '50.00', bulk_discount_enabled: 'true' })
+  const [settings, setSettings]           = useState<Settings>({ courier_locker_price: '80.00', courier_house_price: '140.00', bulk_discount_enabled: 'true' })
 
   // UI state
   const [theme, setTheme]                 = useState<'rose' | 'noir'>('rose')
@@ -87,12 +95,13 @@ export default function HomePage() {
   // Cart state
   const [cart, setCart]                   = useState<CartItem[]>([])
   const [isCartOpen, setIsCartOpen]       = useState(false)
-  const [includeDelivery, setIncludeDelivery] = useState(false)
+  const [courierOption, setCourierOption] = useState<CourierOption>('')
 
   // Checkout state (BobPay)
   const [checkoutStep, setCheckoutStep]   = useState<'cart' | 'details'>('cart')
   const [customerEmail, setCustomerEmail] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
+  const [deliveryAddress, setDeliveryAddress] = useState('')
   const [isCheckingOut, setIsCheckingOut] = useState(false)
   const [checkoutError, setCheckoutError] = useState('')
 
@@ -228,7 +237,11 @@ export default function HomePage() {
   }
 
   const getSubtotal    = () => cart.reduce((t, i) => t + i.price * i.quantity, 0)
-  const getDeliveryCost = () => includeDelivery ? parseFloat(settings.delivery_cost || '0') : 0
+  const getDeliveryCost = () => {
+    if (courierOption === 'courier_guy_locker') return parseFloat(settings.courier_locker_price || '80')
+    if (courierOption === 'house_delivery') return parseFloat(settings.courier_house_price || '140')
+    return 0
+  }
   const getTotalPrice  = () => getSubtotal() + getDeliveryCost()
   const totalItems     = () => cart.reduce((t, i) => t + i.quantity, 0)
 
@@ -236,6 +249,18 @@ export default function HomePage() {
   const handleBobPayCheckout = async () => {
     if (!customerEmail || !customerEmail.includes('@')) {
       setCheckoutError('Please enter a valid email address.')
+      return
+    }
+    if (!customerPhone) {
+      setCheckoutError('Please enter a contact number.')
+      return
+    }
+    if (!deliveryAddress) {
+      setCheckoutError('Please enter a delivery address.')
+      return
+    }
+    if (!courierOption) {
+      setCheckoutError('Please select a courier option.')
       return
     }
     setCheckoutError('')
@@ -250,7 +275,8 @@ export default function HomePage() {
             variantId: i.variantId, name: i.name, size: i.size,
             price: i.price, quantity: i.quantity, isBulkPrice: i.isBulkPrice,
           })),
-          includeDelivery,
+          courierOption,
+          deliveryAddress,
           customerType,
           customerEmail,
           customerPhone,
@@ -998,18 +1024,50 @@ export default function HomePage() {
                     className="border-t px-6 py-5 flex-shrink-0"
                     style={{ borderColor: 'var(--border)', background: 'var(--surface-alt)' }}
                   >
-                    {/* Delivery checkbox */}
-                    <label className="flex items-center gap-3 cursor-pointer mb-4">
-                      <input
-                        type="checkbox"
-                        checked={includeDelivery}
-                        onChange={e => setIncludeDelivery(e.target.checked)}
-                        className="w-4 h-4 accent-amber-500"
-                      />
-                      <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                        Include delivery ({formatPrice(parseFloat(settings.delivery_cost || '0'))})
-                      </span>
-                    </label>
+                    {/* Bundling note */}
+                    <p
+                      className="text-xs mb-3 px-3 py-2"
+                      style={{ background: 'var(--accent-light)', color: 'var(--gold)', border: '1px solid var(--border)' }}
+                    >
+                      📦 Bundle up to 10 items into one delivery for the same courier fee!
+                    </p>
+
+                    {/* Courier selection */}
+                    <p className="text-sm font-medium mb-2" style={{ color: 'var(--text)' }}>
+                      Choose a courier *
+                    </p>
+                    <div className="space-y-2 mb-4">
+                      {(['courier_guy_locker', 'house_delivery'] as const).map(option => (
+                        <label
+                          key={option}
+                          className="flex items-center justify-between gap-3 px-3 py-2 cursor-pointer"
+                          style={{
+                            border: `1px solid ${courierOption === option ? 'var(--gold)' : 'var(--border)'}`,
+                            background: 'var(--surface)',
+                          }}
+                        >
+                          <span className="flex items-center gap-3">
+                            <input
+                              type="radio"
+                              name="courierOption"
+                              checked={courierOption === option}
+                              onChange={() => setCourierOption(option)}
+                              className="w-4 h-4 accent-amber-500"
+                            />
+                            <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                              {COURIER_LABELS[option]}
+                            </span>
+                          </span>
+                          <span className="text-sm" style={{ color: 'var(--text)' }}>
+                            {formatPrice(parseFloat(
+                              option === 'courier_guy_locker'
+                                ? settings.courier_locker_price || '80'
+                                : settings.courier_house_price || '140'
+                            ))}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
 
                     {/* Price breakdown */}
                     <div className="space-y-2 mb-4">
@@ -1017,7 +1075,7 @@ export default function HomePage() {
                         <span>Subtotal</span>
                         <span>{formatPrice(getSubtotal())}</span>
                       </div>
-                      {includeDelivery && (
+                      {courierOption && (
                         <div className="flex justify-between text-sm" style={{ color: 'var(--text-muted)' }}>
                           <span>Delivery</span>
                           <span>{formatPrice(getDeliveryCost())}</span>
@@ -1036,7 +1094,9 @@ export default function HomePage() {
 
                     <button
                       onClick={() => setCheckoutStep('details')}
+                      disabled={!courierOption}
                       className="btn-gold w-full text-center"
+                      style={{ opacity: !courierOption ? 0.6 : 1 }}
                     >
                       <span>Proceed to Payment</span>
                     </button>
@@ -1061,9 +1121,9 @@ export default function HomePage() {
                         <span>{formatPrice(item.price * item.quantity)}</span>
                       </div>
                     ))}
-                    {includeDelivery && (
+                    {courierOption && (
                       <div className="flex justify-between text-sm" style={{ color: 'var(--text-muted)' }}>
-                        <span>Delivery</span>
+                        <span>Delivery ({COURIER_LABELS[courierOption]})</span>
                         <span>{formatPrice(getDeliveryCost())}</span>
                       </div>
                     )}
@@ -1112,10 +1172,11 @@ export default function HomePage() {
                         className="block text-xs mb-2"
                         style={{ color: 'var(--text-muted)', letterSpacing: '0.1em', textTransform: 'uppercase' }}
                       >
-                        Phone Number (optional)
+                        Contact Number *
                       </label>
                       <input
                         type="tel"
+                        required
                         value={customerPhone}
                         onChange={e => setCustomerPhone(e.target.value)}
                         placeholder="+27 82 123 4567"
@@ -1127,6 +1188,29 @@ export default function HomePage() {
                         }}
                         onFocus={e => (e.target as HTMLInputElement).style.borderColor = 'var(--gold)'}
                         onBlur={e => (e.target as HTMLInputElement).style.borderColor = 'var(--border)'}
+                      />
+                    </div>
+                    <div>
+                      <label
+                        className="block text-xs mb-2"
+                        style={{ color: 'var(--text-muted)', letterSpacing: '0.1em', textTransform: 'uppercase' }}
+                      >
+                        Physical Delivery Address *
+                      </label>
+                      <textarea
+                        required
+                        value={deliveryAddress}
+                        onChange={e => setDeliveryAddress(e.target.value)}
+                        placeholder="Street address, suburb, city, postal code"
+                        rows={3}
+                        className="w-full px-4 py-3 text-sm outline-none transition-colors resize-none"
+                        style={{
+                          background: 'var(--surface)',
+                          border: '1px solid var(--border)',
+                          color: 'var(--text)',
+                        }}
+                        onFocus={e => (e.target as HTMLTextAreaElement).style.borderColor = 'var(--gold)'}
+                        onBlur={e => (e.target as HTMLTextAreaElement).style.borderColor = 'var(--border)'}
                       />
                     </div>
                   </div>
@@ -1150,9 +1234,9 @@ export default function HomePage() {
                 >
                   <button
                     onClick={handleBobPayCheckout}
-                    disabled={isCheckingOut || !customerEmail}
+                    disabled={isCheckingOut || !customerEmail || !customerPhone || !deliveryAddress || !courierOption}
                     className="btn-gold w-full flex items-center justify-center gap-2"
-                    style={{ opacity: isCheckingOut || !customerEmail ? 0.65 : 1 }}
+                    style={{ opacity: isCheckingOut || !customerEmail || !customerPhone || !deliveryAddress || !courierOption ? 0.65 : 1 }}
                   >
                     {isCheckingOut ? (
                       <>

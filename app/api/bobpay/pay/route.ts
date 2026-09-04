@@ -15,17 +15,26 @@ interface CartItem {
   isBulkPrice: boolean
 }
 
+const COURIER_OPTIONS = {
+  courier_guy_locker: { label: 'Courier Guy Locker', settingKey: 'courier_locker_price', fallback: 80 },
+  house_delivery:     { label: 'House Delivery',     settingKey: 'courier_house_price',  fallback: 140 },
+} as const
+
+type CourierOption = keyof typeof COURIER_OPTIONS
+
 export async function POST(request: NextRequest) {
   try {
     const {
       items,
-      includeDelivery,
+      courierOption,
+      deliveryAddress,
       customerType,
       customerEmail,
       customerPhone,
     }: {
       items: CartItem[]
-      includeDelivery: boolean
+      courierOption: CourierOption
+      deliveryAddress: string
       customerType: 'regular' | 'reseller'
       customerEmail: string
       customerPhone?: string
@@ -38,13 +47,20 @@ export async function POST(request: NextRequest) {
     if (!customerEmail || !customerEmail.includes('@')) {
       return NextResponse.json({ error: 'Valid email is required' }, { status: 400 })
     }
-
-    // ─── Fetch delivery cost from settings ────────────────────────────────
-    let deliveryCost = 0
-    if (includeDelivery) {
-      const setting = await prisma.setting.findUnique({ where: { key: 'delivery_cost' } })
-      deliveryCost = setting ? parseFloat(setting.value) : 50
+    if (!customerPhone) {
+      return NextResponse.json({ error: 'Contact number is required' }, { status: 400 })
     }
+    if (!deliveryAddress) {
+      return NextResponse.json({ error: 'Delivery address is required' }, { status: 400 })
+    }
+    if (!courierOption || !COURIER_OPTIONS[courierOption]) {
+      return NextResponse.json({ error: 'A courier option is required' }, { status: 400 })
+    }
+
+    // ─── Fetch courier delivery cost from settings ─────────────────────────
+    const courier = COURIER_OPTIONS[courierOption]
+    const setting = await prisma.setting.findUnique({ where: { key: courier.settingKey } })
+    const deliveryCost = setting ? parseFloat(setting.value) : courier.fallback
 
     // ─── Calculate totals ─────────────────────────────────────────────────
     const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
@@ -73,15 +89,17 @@ export async function POST(request: NextRequest) {
         data: {
           customPaymentId,
           customerEmail:   customerEmail,
-          customerPhone:   customerPhone || null,
+          customerPhone:   customerPhone,
           customerType:    customerType,
+          deliveryAddress,
+          courierOption,
           items:           JSON.stringify(items),
           subtotal,
           deliveryCost,
           totalAmount:     total,
           currency:        'ZAR',
           status:          'pending',
-          includeDelivery: includeDelivery,
+          includeDelivery: true,
           isTest:          BOBPAY_CONFIG.isSandbox,
         },
       })
