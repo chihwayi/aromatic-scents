@@ -420,14 +420,52 @@ export default function AdminPanel() {
 
   const SettingsForm = () => {
     const [formSettings, setFormSettings] = useState(settings)
+    const [currentPassword, setCurrentPassword] = useState('')
+    const [newPassword, setNewPassword] = useState('')
+    const [confirmPassword, setConfirmPassword] = useState('')
+    const [isChangingPassword, setIsChangingPassword] = useState(false)
+    const [passwordMessage, setPasswordMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
     const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault()
       saveSettings(formSettings)
     }
 
+    const handlePasswordChange = async (e: React.FormEvent) => {
+      e.preventDefault()
+      setPasswordMessage(null)
+
+      if (newPassword !== confirmPassword) {
+        setPasswordMessage({ type: 'error', text: 'New passwords do not match.' })
+        return
+      }
+
+      setIsChangingPassword(true)
+      try {
+        const res = await fetch('/api/admin/change-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ currentPassword, newPassword }),
+        })
+        const data = await res.json()
+
+        if (!res.ok) {
+          setPasswordMessage({ type: 'error', text: data.error || 'Something went wrong.' })
+        } else {
+          setPasswordMessage({ type: 'success', text: 'Password updated successfully.' })
+          setCurrentPassword('')
+          setNewPassword('')
+          setConfirmPassword('')
+        }
+      } catch {
+        setPasswordMessage({ type: 'error', text: 'Something went wrong.' })
+      } finally {
+        setIsChangingPassword(false)
+      }
+    }
+
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto py-8">
         <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
           <h3 className="text-xl font-semibold text-gray-900 mb-6">Application Settings</h3>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -472,6 +510,64 @@ export default function AdminPanel() {
               </button>
             </div>
           </form>
+
+          <div className="border-t border-gray-200 mt-8 pt-6">
+            <h3 className="text-xl font-semibold text-gray-900 mb-6">Change Password</h3>
+            <form onSubmit={handlePasswordChange} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Current Password
+                </label>
+                <input
+                  type="password"
+                  required
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  New Password
+                </label>
+                <input
+                  type="password"
+                  required
+                  minLength={8}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Confirm New Password
+                </label>
+                <input
+                  type="password"
+                  required
+                  minLength={8}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500"
+                />
+              </div>
+
+              {passwordMessage && (
+                <div className={passwordMessage.type === 'success' ? 'text-green-600 text-sm' : 'text-red-600 text-sm'}>
+                  {passwordMessage.text}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={isChangingPassword}
+                className="w-full px-4 py-2 bg-rose-500 text-white rounded-xl hover:bg-rose-600 transition-colors disabled:opacity-50"
+              >
+                {isChangingPassword ? 'Updating...' : 'Update Password'}
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     )
