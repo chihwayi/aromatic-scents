@@ -57,13 +57,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'A courier option is required' }, { status: 400 })
     }
 
-    // ─── Fetch courier delivery cost from settings ─────────────────────────
-    const courier = COURIER_OPTIONS[courierOption]
-    const setting = await prisma.setting.findUnique({ where: { key: courier.settingKey } })
-    const deliveryCost = setting ? parseFloat(setting.value) : courier.fallback
-
     // ─── Calculate totals ─────────────────────────────────────────────────
     const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
+
+    // ─── Fetch courier delivery cost from settings (free above threshold) ──
+    const courier = COURIER_OPTIONS[courierOption]
+    const [courierSetting, thresholdSetting] = await Promise.all([
+      prisma.setting.findUnique({ where: { key: courier.settingKey } }),
+      prisma.setting.findUnique({ where: { key: 'free_delivery_threshold' } }),
+    ])
+    const freeDeliveryThreshold = thresholdSetting ? parseFloat(thresholdSetting.value) : 800
+    const deliveryCost = subtotal >= freeDeliveryThreshold
+      ? 0
+      : courierSetting ? parseFloat(courierSetting.value) : courier.fallback
+
     const total = subtotal + deliveryCost
 
     // ─── Generate internal order ID ───────────────────────────────────────

@@ -65,6 +65,7 @@ interface RecentOrder {
 interface AppSettings {
   courier_locker_price: string
   courier_house_price: string
+  free_delivery_threshold: string
   bulk_discount_enabled: string
 }
 
@@ -83,6 +84,7 @@ export default function AdminPanel() {
   const [settings, setSettings] = useState<AppSettings>({
     courier_locker_price: '80.00',
     courier_house_price: '140.00',
+    free_delivery_threshold: '800.00',
     bulk_discount_enabled: 'true'
   })
   const [stats, setStats] = useState<AdminStats>({
@@ -502,6 +504,19 @@ export default function AdminPanel() {
                 onChange={(e) => setFormSettings({ ...formSettings, courier_house_price: e.target.value })}
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500"
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Free Delivery Threshold (R)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                value={formSettings.free_delivery_threshold}
+                onChange={(e) => setFormSettings({ ...formSettings, free_delivery_threshold: e.target.value })}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500"
+              />
+              <p className="text-xs text-gray-500 mt-1">Orders at or above this subtotal get free delivery.</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">

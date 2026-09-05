@@ -44,6 +44,7 @@ interface CartItem {
 interface Settings {
   courier_locker_price: string
   courier_house_price: string
+  free_delivery_threshold: string
   bulk_discount_enabled: string
 }
 
@@ -84,7 +85,7 @@ export default function HomePage() {
   const [products, setProducts]           = useState<Product[]>([])
   const [newArrivals, setNewArrivals]     = useState<Product[]>([])
   const [loading, setLoading]             = useState(true)
-  const [settings, setSettings]           = useState<Settings>({ courier_locker_price: '80.00', courier_house_price: '140.00', bulk_discount_enabled: 'true' })
+  const [settings, setSettings]           = useState<Settings>({ courier_locker_price: '80.00', courier_house_price: '140.00', free_delivery_threshold: '800.00', bulk_discount_enabled: 'true' })
 
   // UI state
   const [theme, setTheme]                 = useState<'rose' | 'noir'>('rose')
@@ -237,7 +238,11 @@ export default function HomePage() {
   }
 
   const getSubtotal    = () => cart.reduce((t, i) => t + i.price * i.quantity, 0)
+  const qualifiesForFreeDelivery = () =>
+    getSubtotal() >= parseFloat(settings.free_delivery_threshold || '800')
   const getDeliveryCost = () => {
+    if (!courierOption) return 0
+    if (qualifiesForFreeDelivery()) return 0
     if (courierOption === 'courier_guy_locker') return parseFloat(settings.courier_locker_price || '80')
     if (courierOption === 'house_delivery') return parseFloat(settings.courier_house_price || '140')
     return 0
@@ -1032,6 +1037,20 @@ export default function HomePage() {
                       📦 Bundle up to 10 items into one delivery for the same courier fee!
                     </p>
 
+                    {/* Free delivery note */}
+                    {qualifiesForFreeDelivery() ? (
+                      <p
+                        className="text-xs mb-3 px-3 py-2"
+                        style={{ background: 'var(--accent-light)', color: 'var(--gold)', border: '1px solid var(--border)' }}
+                      >
+                        🎉 You&apos;ve unlocked free delivery on this order!
+                      </p>
+                    ) : (
+                      <p className="text-xs mb-3" style={{ color: 'var(--text-faint)' }}>
+                        Spend {formatPrice(Math.max(0, parseFloat(settings.free_delivery_threshold || '800') - getSubtotal()))} more to get free delivery.
+                      </p>
+                    )}
+
                     {/* Courier selection */}
                     <p className="text-sm font-medium mb-2" style={{ color: 'var(--text)' }}>
                       Choose a courier *
@@ -1058,8 +1077,8 @@ export default function HomePage() {
                               {COURIER_LABELS[option]}
                             </span>
                           </span>
-                          <span className="text-sm" style={{ color: 'var(--text)' }}>
-                            {formatPrice(parseFloat(
+                          <span className="text-sm" style={{ color: qualifiesForFreeDelivery() ? 'var(--gold)' : 'var(--text)' }}>
+                            {qualifiesForFreeDelivery() ? 'FREE' : formatPrice(parseFloat(
                               option === 'courier_guy_locker'
                                 ? settings.courier_locker_price || '80'
                                 : settings.courier_house_price || '140'
@@ -1078,7 +1097,7 @@ export default function HomePage() {
                       {courierOption && (
                         <div className="flex justify-between text-sm" style={{ color: 'var(--text-muted)' }}>
                           <span>Delivery</span>
-                          <span>{formatPrice(getDeliveryCost())}</span>
+                          <span>{qualifiesForFreeDelivery() ? 'FREE' : formatPrice(getDeliveryCost())}</span>
                         </div>
                       )}
                       <div
@@ -1124,7 +1143,7 @@ export default function HomePage() {
                     {courierOption && (
                       <div className="flex justify-between text-sm" style={{ color: 'var(--text-muted)' }}>
                         <span>Delivery ({COURIER_LABELS[courierOption]})</span>
-                        <span>{formatPrice(getDeliveryCost())}</span>
+                        <span>{qualifiesForFreeDelivery() ? 'FREE' : formatPrice(getDeliveryCost())}</span>
                       </div>
                     )}
                     <div
