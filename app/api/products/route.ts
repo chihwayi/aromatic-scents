@@ -11,11 +11,23 @@ interface ProductVariantInput {
   stock_quantity: number
 }
 
+interface FragranceNotesInput {
+  top?: string
+  heart?: string
+  base?: string
+}
+
 interface ProductInput {
   name: string
   description: string
   image_url: string
   is_new_arrival?: boolean
+  fragrance_notes?: FragranceNotesInput | null
+}
+
+function serializeFragranceNotes(notes: FragranceNotesInput | null | undefined): string | null {
+  if (!notes || (!notes.top && !notes.heart && !notes.base)) return null
+  return JSON.stringify({ top: notes.top || '', heart: notes.heart || '', base: notes.base || '' })
 }
 
 interface CreateProductRequest {
@@ -73,10 +85,11 @@ export async function POST(request: NextRequest) {
 
     const created = await prisma.product.create({
       data: {
-        name:         product.name,
-        description:  product.description,
-        imageUrl:     product.image_url,
-        isNewArrival: product.is_new_arrival || false,
+        name:           product.name,
+        description:    product.description,
+        imageUrl:       product.image_url,
+        isNewArrival:   product.is_new_arrival || false,
+        fragranceNotes: serializeFragranceNotes(product.fragrance_notes),
         variants: {
           create: (variants || []).map(v => ({
             sizeMl:          v.size_ml,
@@ -108,10 +121,11 @@ export async function PUT(request: NextRequest) {
       await tx.product.update({
         where: { id },
         data: {
-          name:         product.name,
-          description:  product.description,
-          imageUrl:     product.image_url,
-          isNewArrival: product.is_new_arrival || false,
+          name:           product.name,
+          description:    product.description,
+          imageUrl:       product.image_url,
+          isNewArrival:   product.is_new_arrival || false,
+          fragranceNotes: serializeFragranceNotes(product.fragrance_notes),
         },
       })
 

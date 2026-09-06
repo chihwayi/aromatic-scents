@@ -16,12 +16,19 @@ interface ProductVariant {
   stock_quantity: number
 }
 
+interface FragranceNotes {
+  top: string
+  heart: string
+  base: string
+}
+
 interface Product {
   id?: string
   name: string
   description: string
   image_url: string
   is_new_arrival?: boolean
+  fragrance_notes?: FragranceNotes | null
   product_variants?: ProductVariant[]
 }
 
@@ -113,6 +120,7 @@ export default function AdminPanel() {
     description: '',
     image_url: '',
     is_new_arrival: false,
+    fragrance_notes: { top: '', heart: '', base: '' },
     product_variants: [
       { size_ml: 35, regular_price: 0, bulk_price: 0, bulk_min_quantity: 6, stock_quantity: 0 },
       { size_ml: 50, regular_price: 0, bulk_price: 0, bulk_min_quantity: 6, stock_quantity: 0 },
@@ -208,9 +216,16 @@ export default function AdminPanel() {
   const saveProduct = async (product: Product) => {
     try {
       const method = product.id ? 'PUT' : 'POST'
-      const body = product.id 
-        ? { id: product.id, product: { name: product.name, description: product.description, image_url: product.image_url, is_new_arrival: product.is_new_arrival }, variants: product.product_variants }
-        : { product: { name: product.name, description: product.description, image_url: product.image_url, is_new_arrival: product.is_new_arrival }, variants: product.product_variants }
+      const productInput = {
+        name: product.name,
+        description: product.description,
+        image_url: product.image_url,
+        is_new_arrival: product.is_new_arrival,
+        fragrance_notes: product.fragrance_notes,
+      }
+      const body = product.id
+        ? { id: product.id, product: productInput, variants: product.product_variants }
+        : { product: productInput, variants: product.product_variants }
 
       const response = await fetch('/api/products', {
         method,
@@ -275,7 +290,10 @@ export default function AdminPanel() {
     onSave: (product: Product) => void
     onCancel: () => void
   }) => {
-    const [formData, setFormData] = useState(product)
+    const [formData, setFormData] = useState<Product>({
+      ...product,
+      fragrance_notes: product.fragrance_notes || { top: '', heart: '', base: '' },
+    })
     const [isUploading, setIsUploading] = useState(false)
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -397,6 +415,54 @@ export default function AdminPanel() {
           <p className="text-xs text-gray-500 mt-1 ml-7">
             New arrivals will be displayed in a special section on the homepage
           </p>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Fragrance Notes</h3>
+          <p className="text-xs text-gray-500 mb-4">
+            Shown on the product card, e.g. &ldquo;Top &middot; Sea Salt, Citrus&rdquo;. Leave blank to hide.
+          </p>
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Top</label>
+              <input
+                type="text"
+                value={formData.fragrance_notes?.top || ''}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  fragrance_notes: { ...formData.fragrance_notes, top: e.target.value, heart: formData.fragrance_notes?.heart || '', base: formData.fragrance_notes?.base || '' },
+                })}
+                placeholder="Sea Salt, Citrus"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all duration-300"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Heart</label>
+              <input
+                type="text"
+                value={formData.fragrance_notes?.heart || ''}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  fragrance_notes: { ...formData.fragrance_notes, top: formData.fragrance_notes?.top || '', heart: e.target.value, base: formData.fragrance_notes?.base || '' },
+                })}
+                placeholder="White Flowers, Aquatic"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all duration-300"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Base</label>
+              <input
+                type="text"
+                value={formData.fragrance_notes?.base || ''}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  fragrance_notes: { ...formData.fragrance_notes, top: formData.fragrance_notes?.top || '', heart: formData.fragrance_notes?.heart || '', base: e.target.value },
+                })}
+                placeholder="Driftwood, Musk"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all duration-300"
+              />
+            </div>
+          </div>
         </div>
 
         <div>
