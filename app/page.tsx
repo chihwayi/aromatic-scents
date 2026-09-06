@@ -334,7 +334,7 @@ export default function HomePage() {
 
       {/* ─── Announcement Bar ────────────────────────────────────────────── */}
       <div className="announcement-bar">
-        Complimentary gift wrapping on orders over R500&nbsp;·&nbsp;Nationwide delivery available
+        Enjoy free shipping on orders from R800&nbsp;·&nbsp;Nationwide delivery available
       </div>
 
       {/* ─── Header ──────────────────────────────────────────────────────── */}

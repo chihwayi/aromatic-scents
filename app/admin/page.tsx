@@ -276,6 +276,30 @@ export default function AdminPanel() {
     onCancel: () => void
   }) => {
     const [formData, setFormData] = useState(product)
+    const [isUploading, setIsUploading] = useState(false)
+
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0]
+      if (!file) return
+
+      setIsUploading(true)
+      try {
+        const uploadFormData = new FormData()
+        uploadFormData.append('file', file)
+        const res = await fetch('/api/admin/upload', { method: 'POST', body: uploadFormData })
+        const data = await res.json()
+
+        if (!res.ok) {
+          alert(data.error || 'Failed to upload image')
+        } else {
+          setFormData(prev => ({ ...prev, image_url: data.url }))
+        }
+      } catch {
+        alert('Failed to upload image')
+      } finally {
+        setIsUploading(false)
+      }
+    }
 
     const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault()
@@ -329,10 +353,28 @@ export default function AdminPanel() {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Image URL
+            Product Image
           </label>
+          {formData.image_url && (
+            <div className="mb-3">
+              <img src={formData.image_url} alt="Preview" className="h-32 w-32 object-cover rounded-xl border border-gray-200" />
+            </div>
+          )}
+          <div className="flex items-center gap-3 mb-3">
+            <label className="flex items-center px-4 py-2 bg-rose-50 text-rose-700 rounded-xl cursor-pointer hover:bg-rose-100 transition-colors text-sm font-medium">
+              {isUploading ? 'Uploading...' : 'Upload from computer'}
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleFileUpload}
+                disabled={isUploading}
+                className="hidden"
+              />
+            </label>
+            <span className="text-xs text-gray-400">or paste a URL below</span>
+          </div>
           <input
-            type="url"
+            type="text"
             value={formData.image_url}
             onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
             className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all duration-300"
