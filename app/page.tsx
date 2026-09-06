@@ -46,6 +46,9 @@ interface Settings {
   courier_house_price: string
   free_delivery_threshold: string
   bulk_discount_enabled: string
+  contact_address: string
+  contact_phone: string
+  contact_email: string
 }
 
 type CourierOption = '' | 'courier_guy_locker' | 'house_delivery'
@@ -55,27 +58,13 @@ const COURIER_LABELS: Record<Exclude<CourierOption, ''>, string> = {
   house_delivery: 'House Delivery',
 }
 
-// ─── Static testimonials ──────────────────────────────────────────────────────
-const TESTIMONIALS = [
-  {
-    name: 'Nomsa K.',
-    location: 'Johannesburg',
-    stars: 5,
-    text: 'Midnight Elegance is everything. The longevity is incredible — I still get compliments hours after applying. Easily the most luxurious fragrance I\'ve worn.',
-  },
-  {
-    name: 'Thabo M.',
-    location: 'Cape Town',
-    stars: 5,
-    text: 'Ordered the 100ml Golden Sunset as a gift and the presentation was immaculate. The scent is warm and sophisticated — my wife was absolutely blown away.',
-  },
-  {
-    name: 'Lesedi R.',
-    location: 'Pretoria',
-    stars: 5,
-    text: 'The reseller pricing is exceptional. I now stock three of their fragrances in my boutique and my clients keep coming back for more. Delivery is always prompt.',
-  },
-]
+interface Testimonial {
+  id: string
+  name: string
+  location: string
+  stars: number
+  text: string
+}
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function HomePage() {
@@ -85,7 +74,16 @@ export default function HomePage() {
   const [products, setProducts]           = useState<Product[]>([])
   const [newArrivals, setNewArrivals]     = useState<Product[]>([])
   const [loading, setLoading]             = useState(true)
-  const [settings, setSettings]           = useState<Settings>({ courier_locker_price: '80.00', courier_house_price: '140.00', free_delivery_threshold: '800.00', bulk_discount_enabled: 'true' })
+  const [settings, setSettings]           = useState<Settings>({
+    courier_locker_price: '80.00',
+    courier_house_price: '140.00',
+    free_delivery_threshold: '800.00',
+    bulk_discount_enabled: 'true',
+    contact_address: '123 Fragrance Avenue\nPretoria, South Africa',
+    contact_phone: '+27 84 961 5725',
+    contact_email: 'info@aromaticscents.co.za',
+  })
+  const [testimonials, setTestimonials]   = useState<Testimonial[]>([])
 
   // UI state
   const [theme, setTheme]                 = useState<'rose' | 'noir'>('rose')
@@ -109,7 +107,7 @@ export default function HomePage() {
   // Cancelled flash message
   const [showCancelledMsg, setShowCancelledMsg] = useState(false)
 
-  const phoneNumber  = '27849615725'
+  const phoneNumber  = settings.contact_phone.replace(/[^0-9]/g, '')
   const whatsappUrl  = `https://wa.me/${phoneNumber}?text=Hi! I'm interested in your perfume collection.`
 
   // ─── Theme: persist in localStorage + apply to <html> ─────────────────────
@@ -136,7 +134,7 @@ export default function HomePage() {
   }, [])
 
   // ─── Fetch data ────────────────────────────────────────────────────────────
-  useEffect(() => { fetchProducts(); fetchSettings() }, [])
+  useEffect(() => { fetchProducts(); fetchSettings(); fetchTestimonials() }, [])
 
   const fetchProducts = async () => {
     try {
@@ -170,10 +168,21 @@ export default function HomePage() {
     try {
       const response = await fetch('/api/settings')
       if (!response.ok) throw new Error('Failed to fetch settings')
-      const data: Settings = await response.json()
-      setSettings(data)
+      const data: Partial<Settings> = await response.json()
+      setSettings(prev => ({ ...prev, ...data }))
     } catch (e) {
       console.error('Error fetching settings:', e)
+    }
+  }
+
+  const fetchTestimonials = async () => {
+    try {
+      const response = await fetch('/api/testimonials?active=1')
+      if (!response.ok) throw new Error('Failed to fetch testimonials')
+      const data: Testimonial[] = await response.json()
+      setTestimonials(data)
+    } catch (e) {
+      console.error('Error fetching testimonials:', e)
     }
   }
 
@@ -729,8 +738,8 @@ export default function HomePage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {TESTIMONIALS.map((t, i) => (
-              <div key={i} className="testimonial-card">
+            {testimonials.map((t) => (
+              <div key={t.id} className="testimonial-card">
                 <div className="flex gap-0.5 mb-6">
                   {[...Array(t.stars)].map((_, s) => (
                     <Star key={s} className="h-3.5 w-3.5 fill-current" style={{ color: 'var(--gold)' }} />
@@ -832,9 +841,9 @@ export default function HomePage() {
               </h4>
               <div className="space-y-4">
                 {[
-                  { Icon: MapPin, text: '123 Fragrance Avenue\nPretoria, South Africa' },
-                  { Icon: Phone, text: '+27 849 615 725' },
-                  { Icon: Mail, text: 'info@aromaticscents.co.za' },
+                  { Icon: MapPin, text: settings.contact_address },
+                  { Icon: Phone, text: settings.contact_phone },
+                  { Icon: Mail, text: settings.contact_email },
                 ].map(({ Icon, text }, i) => (
                   <div key={i} className="flex gap-3">
                     <Icon className="h-4 w-4 flex-shrink-0 mt-0.5" style={{ color: 'var(--gold)' }} />

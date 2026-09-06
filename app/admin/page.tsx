@@ -74,6 +74,19 @@ interface AppSettings {
   courier_house_price: string
   free_delivery_threshold: string
   bulk_discount_enabled: string
+  contact_address: string
+  contact_phone: string
+  contact_email: string
+}
+
+interface Testimonial {
+  id?: string
+  name: string
+  location: string
+  stars: number
+  text: string
+  order_index: number
+  is_active: boolean
 }
 
 const COURIER_LABELS: Record<string, string> = {
@@ -92,8 +105,14 @@ export default function AdminPanel() {
     courier_locker_price: '80.00',
     courier_house_price: '140.00',
     free_delivery_threshold: '800.00',
-    bulk_discount_enabled: 'true'
+    bulk_discount_enabled: 'true',
+    contact_address: '123 Fragrance Avenue\nPretoria, South Africa',
+    contact_phone: '+27 84 961 5725',
+    contact_email: 'info@aromaticscents.co.za',
   })
+  const [testimonials, setTestimonials] = useState<Testimonial[]>([])
+  const [isAddingTestimonial, setIsAddingTestimonial] = useState(false)
+  const [editingTestimonial, setEditingTestimonial] = useState<Testimonial | null>(null)
   const [stats, setStats] = useState<AdminStats>({
     totalProducts: 0,
     totalVariants: 0,
@@ -112,7 +131,7 @@ export default function AdminPanel() {
     revenue_last_30_days: 0,
   })
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([])
-  const [activeTab, setActiveTab] = useState<'overview' | 'orders' | 'products'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'orders' | 'products' | 'testimonials'>('overview')
   const router = useRouter()
 
   const emptyProduct: Product = {
@@ -178,12 +197,54 @@ export default function AdminPanel() {
       const response = await fetch('/api/settings')
       if (response.ok) {
         const data = await response.json()
-        setSettings(data)
+        setSettings(prev => ({ ...prev, ...data }))
       }
     } catch (error) {
       console.error('Error fetching settings:', error)
     }
   }, [])
+
+  const fetchTestimonials = useCallback(async () => {
+    try {
+      const response = await fetch('/api/testimonials')
+      if (response.ok) {
+        const data = await response.json()
+        setTestimonials(data)
+      }
+    } catch (error) {
+      console.error('Error fetching testimonials:', error)
+    }
+  }, [])
+
+  const saveTestimonial = async (testimonial: Testimonial) => {
+    try {
+      const method = testimonial.id ? 'PUT' : 'POST'
+      const response = await fetch('/api/testimonials', {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(testimonial),
+      })
+      if (!response.ok) throw new Error('Failed to save testimonial')
+      fetchTestimonials()
+      setEditingTestimonial(null)
+      setIsAddingTestimonial(false)
+    } catch (error) {
+      console.error('Error saving testimonial:', error)
+      alert('Error saving testimonial. Please try again.')
+    }
+  }
+
+  const deleteTestimonial = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this testimonial?')) return
+    try {
+      const response = await fetch(`/api/testimonials?id=${id}`, { method: 'DELETE' })
+      if (!response.ok) throw new Error('Failed to delete testimonial')
+      fetchTestimonials()
+    } catch (error) {
+      console.error('Error deleting testimonial:', error)
+      alert('Error deleting testimonial. Please try again.')
+    }
+  }
 
   const fetchProducts = useCallback(async () => {
     try {
@@ -205,8 +266,8 @@ export default function AdminPanel() {
   useEffect(() => {
     // Auth is enforced by middleware — by the time this component renders
     // the request has already been redirected to /admin/login if unauthenticated.
-    Promise.all([fetchProducts(), fetchSettings(), fetchOrderStats(), fetchRecentOrders()])
-  }, [fetchProducts, fetchSettings, fetchOrderStats, fetchRecentOrders])
+    Promise.all([fetchProducts(), fetchSettings(), fetchOrderStats(), fetchRecentOrders(), fetchTestimonials()])
+  }, [fetchProducts, fetchSettings, fetchOrderStats, fetchRecentOrders, fetchTestimonials])
 
   const handleSignOut = async () => {
     await signOut({ redirect: false })
@@ -639,6 +700,41 @@ export default function AdminPanel() {
                 <option value="false">No</option>
               </select>
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Contact Address
+              </label>
+              <textarea
+                rows={2}
+                value={formSettings.contact_address}
+                onChange={(e) => setFormSettings({ ...formSettings, contact_address: e.target.value })}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Contact Phone
+              </label>
+              <input
+                type="text"
+                value={formSettings.contact_phone}
+                onChange={(e) => setFormSettings({ ...formSettings, contact_phone: e.target.value })}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500"
+                placeholder="+27 84 961 5725"
+              />
+              <p className="text-xs text-gray-500 mt-1">Used for the footer, WhatsApp button and call button.</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Contact Email
+              </label>
+              <input
+                type="email"
+                value={formSettings.contact_email}
+                onChange={(e) => setFormSettings({ ...formSettings, contact_email: e.target.value })}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500"
+              />
+            </div>
             <div className="flex space-x-4 pt-4">
               <button
                 type="submit"
@@ -718,6 +814,106 @@ export default function AdminPanel() {
     )
   }
 
+  const TestimonialForm = ({ testimonial, onSave, onCancel }: {
+    testimonial: Testimonial
+    onSave: (testimonial: Testimonial) => void
+    onCancel: () => void
+  }) => {
+    const [formData, setFormData] = useState<Testimonial>(testimonial)
+
+    const handleSubmit = (e: React.FormEvent) => {
+      e.preventDefault()
+      if (!formData.name || !formData.location || !formData.text) {
+        alert('Please fill in name, location and testimonial text')
+        return
+      }
+      onSave(formData)
+    }
+
+    return (
+      <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-lg border border-rose-100/50 p-8 space-y-6">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Name *</label>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all duration-300"
+              placeholder="Nomsa K."
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Location *</label>
+            <input
+              type="text"
+              value={formData.location}
+              onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all duration-300"
+              placeholder="Johannesburg"
+              required
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Rating</label>
+          <select
+            value={formData.stars}
+            onChange={(e) => setFormData({ ...formData, stars: parseInt(e.target.value) })}
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all duration-300"
+          >
+            {[5, 4, 3, 2, 1].map(n => (
+              <option key={n} value={n}>{n} star{n !== 1 ? 's' : ''}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Testimonial Text *</label>
+          <textarea
+            value={formData.text}
+            onChange={(e) => setFormData({ ...formData, text: e.target.value })}
+            rows={4}
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all duration-300"
+            required
+          />
+        </div>
+
+        <div>
+          <label className="flex items-center space-x-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={formData.is_active}
+              onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+              className="w-4 h-4 text-rose-600 rounded focus:ring-rose-500"
+            />
+            <span className="text-sm font-medium text-gray-700">Show on homepage</span>
+          </label>
+        </div>
+
+        <div className="flex space-x-4">
+          <button
+            type="submit"
+            className="flex items-center px-6 py-3 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-colors"
+          >
+            <Save className="h-4 w-4 mr-2" />
+            Save Testimonial
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="flex items-center px-6 py-3 bg-gray-500 text-white rounded-xl hover:bg-gray-600 transition-colors"
+          >
+            <X className="h-4 w-4 mr-2" />
+            Cancel
+          </button>
+        </div>
+      </form>
+    )
+  }
+
   const statusBadge = (status: string) => {
     const base = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium'
     const map: Record<string, string> = {
@@ -792,7 +988,7 @@ export default function AdminPanel() {
 
         {/* Tab Navigation */}
         <div className="flex space-x-1 mb-8 bg-white/60 backdrop-blur-sm rounded-xl p-1 w-fit border border-rose-100/50 shadow-sm">
-          {(['overview', 'orders', 'products'] as const).map((tab) => (
+          {(['overview', 'orders', 'products', 'testimonials'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -1192,6 +1388,94 @@ export default function AdminPanel() {
                           </button>
                           <button
                             onClick={() => deleteProduct(product.id!)}
+                            className="p-3 text-red-600 hover:bg-red-50 rounded-xl transition-all duration-300"
+                          >
+                            <Trash2 className="h-5 w-5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* ── TESTIMONIALS TAB ── */}
+        {activeTab === 'testimonials' && (
+          <>
+            {!isAddingTestimonial && !editingTestimonial && (
+              <div className="mb-6">
+                <button
+                  onClick={() => setIsAddingTestimonial(true)}
+                  className="flex items-center px-8 py-4 bg-gradient-to-r from-rose-500 to-amber-500 text-white rounded-xl hover:from-rose-600 hover:to-amber-600 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
+                >
+                  <Plus className="h-5 w-5 mr-2" />
+                  Add New Testimonial
+                </button>
+              </div>
+            )}
+
+            {isAddingTestimonial && (
+              <div className="mb-8">
+                <h2 className="text-2xl font-semibold text-gray-900 mb-6">Add New Testimonial</h2>
+                <TestimonialForm
+                  testimonial={{ name: '', location: '', stars: 5, text: '', order_index: testimonials.length, is_active: true }}
+                  onSave={saveTestimonial}
+                  onCancel={() => setIsAddingTestimonial(false)}
+                />
+              </div>
+            )}
+
+            {editingTestimonial && (
+              <div className="mb-8">
+                <h2 className="text-2xl font-semibold text-gray-900 mb-6">Edit Testimonial</h2>
+                <TestimonialForm
+                  testimonial={editingTestimonial}
+                  onSave={saveTestimonial}
+                  onCancel={() => setEditingTestimonial(null)}
+                />
+              </div>
+            )}
+
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-rose-100/50">
+              <div className="px-8 py-6 border-b border-gray-200">
+                <h2 className="text-xl font-semibold text-gray-900">Testimonials ({testimonials.length})</h2>
+              </div>
+
+              {testimonials.length === 0 ? (
+                <div className="p-12 text-center text-gray-500">
+                  <p className="text-lg">No testimonials yet</p>
+                  <p className="text-sm">Add one to show it on the homepage.</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-200">
+                  {testimonials.map((t) => (
+                    <div key={t.id} className="p-8 hover:bg-gray-50/50 transition-colors duration-300">
+                      <div className="flex items-start justify-between gap-6">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <h3 className="text-lg font-semibold text-gray-900">{t.name}</h3>
+                            <span className="text-sm text-gray-500">{t.location}</span>
+                            {!t.is_active && (
+                              <span className="px-2 py-1 bg-gray-200 text-gray-600 text-xs rounded-full font-medium">
+                                Hidden
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-amber-500 text-sm mb-2">{'★'.repeat(t.stars)}{'☆'.repeat(5 - t.stars)}</div>
+                          <p className="text-gray-600 text-sm">{t.text}</p>
+                        </div>
+                        <div className="flex space-x-3">
+                          <button
+                            onClick={() => setEditingTestimonial(t)}
+                            className="p-3 text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-300"
+                          >
+                            <Edit className="h-5 w-5" />
+                          </button>
+                          <button
+                            onClick={() => deleteTestimonial(t.id!)}
                             className="p-3 text-red-600 hover:bg-red-50 rounded-xl transition-all duration-300"
                           >
                             <Trash2 className="h-5 w-5" />
