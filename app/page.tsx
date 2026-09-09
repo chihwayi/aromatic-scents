@@ -1422,8 +1422,8 @@ function ProductCard({
         </h3>
         <div className="gold-line-left my-3" style={{ width: '2rem' }} />
         <p
-          className="text-xs leading-relaxed mb-3 sm:mb-5 line-clamp-2 flex-1"
-          style={{ color: 'var(--text-muted)', fontWeight: 400 }}
+          className="text-xs leading-relaxed mb-3 sm:mb-5"
+          style={{ color: 'var(--text-muted)', fontWeight: 400, whiteSpace: 'pre-line' }}
         >
           {product.description}
         </p>
