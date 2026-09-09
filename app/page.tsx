@@ -649,8 +649,8 @@ export default function HomePage() {
                 className="text-base leading-relaxed mb-10"
                 style={{ color: 'var(--text-muted)', fontWeight: 400 }}
               >
-                From the bergamot-kissed opening of Midnight Elegance to the warm,
-                vanilla-drenched dry-down of Golden Sunset — each bottle is an invitation
+                From the bold, magnetic opening of 212 VIP for Men to the warm,
+                shimmering dry-down of Golden Dust — each bottle is an invitation
                 to experience luxury you can carry with you, always.
               </p>
               <div className="flex flex-wrap gap-8">
