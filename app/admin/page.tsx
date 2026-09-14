@@ -6,6 +6,12 @@ import { useSession, signOut } from 'next-auth/react'
 import { Plus, Edit, Trash2, Save, X, LogOut, User, Package, DollarSign, TrendingUp, Settings, ShoppingCart, CheckCircle2, BarChart3, Truck } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
+import {
+  ProductCategory,
+  PRODUCT_CATEGORIES,
+  CATEGORY_LABELS,
+  ALLOWED_SIZES_BY_CATEGORY,
+} from '@/lib/productCategories'
 
 interface ProductVariant {
   id?: string
@@ -28,8 +34,16 @@ interface Product {
   description: string
   image_url: string
   is_new_arrival?: boolean
+  category?: ProductCategory
   fragrance_notes?: FragranceNotes | null
   product_variants?: ProductVariant[]
+}
+
+function makeVariantsForCategory(category: ProductCategory, existing?: ProductVariant[]): ProductVariant[] {
+  return ALLOWED_SIZES_BY_CATEGORY[category].map(size => {
+    const match = existing?.find(v => v.size_ml === size)
+    return match || { size_ml: size, regular_price: 0, bulk_price: 0, bulk_min_quantity: 6, stock_quantity: 0 }
+  })
 }
 
 interface AdminStats {
@@ -94,6 +108,14 @@ const COURIER_LABELS: Record<string, string> = {
   house_delivery: 'House Delivery',
 }
 
+const PLACEHOLDER_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><rect width="400" height="400" fill="#e5e7eb"/></svg>'
+const PLACEHOLDER_IMAGE =
+  'data:image/svg+xml;base64,' +
+  (typeof window === 'undefined'
+    ? Buffer.from(PLACEHOLDER_SVG).toString('base64')
+    : window.btoa(PLACEHOLDER_SVG))
+
 export default function AdminPanel() {
   const [products, setProducts] = useState<Product[]>([])
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
@@ -139,12 +161,9 @@ export default function AdminPanel() {
     description: '',
     image_url: '',
     is_new_arrival: false,
+    category: 'perfume',
     fragrance_notes: { top: '', heart: '', base: '' },
-    product_variants: [
-      { size_ml: 35, regular_price: 0, bulk_price: 0, bulk_min_quantity: 6, stock_quantity: 0 },
-      { size_ml: 50, regular_price: 0, bulk_price: 0, bulk_min_quantity: 6, stock_quantity: 0 },
-      { size_ml: 100, regular_price: 0, bulk_price: 0, bulk_min_quantity: 4, stock_quantity: 0 }
-    ]
+    product_variants: makeVariantsForCategory('perfume'),
   }
 
   const calculateStats = useCallback((products: Product[]) => {
@@ -282,6 +301,7 @@ export default function AdminPanel() {
         description: product.description,
         image_url: product.image_url,
         is_new_arrival: product.is_new_arrival,
+        category: product.category,
         fragrance_notes: product.fragrance_notes,
       }
       const body = product.id
@@ -353,9 +373,18 @@ export default function AdminPanel() {
   }) => {
     const [formData, setFormData] = useState<Product>({
       ...product,
+      category: product.category || 'perfume',
       fragrance_notes: product.fragrance_notes || { top: '', heart: '', base: '' },
     })
     const [isUploading, setIsUploading] = useState(false)
+
+    const handleCategoryChange = (category: ProductCategory) => {
+      setFormData(prev => ({
+        ...prev,
+        category,
+        product_variants: makeVariantsForCategory(category, prev.product_variants),
+      }))
+    }
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0]
@@ -524,6 +553,20 @@ export default function AdminPanel() {
               />
             </div>
           </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Product Category</label>
+          <select
+            value={formData.category || 'perfume'}
+            onChange={(e) => handleCategoryChange(e.target.value as ProductCategory)}
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all duration-300"
+          >
+            {PRODUCT_CATEGORIES.map(cat => (
+              <option key={cat} value={cat}>{CATEGORY_LABELS[cat]}</option>
+            ))}
+          </select>
+          <p className="text-xs text-gray-500 mt-1">Changing this resets the available bottle sizes below.</p>
         </div>
 
         <div>
@@ -1339,19 +1382,22 @@ export default function AdminPanel() {
                     <div key={product.id} className="p-8 hover:bg-gray-50/50 transition-colors duration-300">
                       <div className="flex items-start space-x-6">
                         <Image
-                          src={product.image_url || 'https://via.placeholder.com/100'}
+                          src={product.image_url || PLACEHOLDER_IMAGE}
                           alt={product.name}
                           width={400}
                           height={400}
                           className="w-24 h-24 object-cover rounded-xl shadow-md"
                           onError={(e) => {
-                            (e.target as HTMLImageElement).src = 'https://via.placeholder.com/100'
+                            (e.target as HTMLImageElement).src = PLACEHOLDER_IMAGE
                           }}
                         />
 
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-2">
                             <h3 className="text-xl font-semibold text-gray-900">{product.name}</h3>
+                            <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full font-medium">
+                              {CATEGORY_LABELS[product.category || 'perfume']}
+                            </span>
                             {product.is_new_arrival && (
                               <span className="px-2 py-1 bg-gradient-to-r from-rose-500 to-amber-500 text-white text-xs rounded-full font-medium">
                                 NEW

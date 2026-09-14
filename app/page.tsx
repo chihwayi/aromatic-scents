@@ -4,11 +4,12 @@ import { useState, useEffect } from 'react'
 import {
   ShoppingBag, Plus, Minus, Facebook, Instagram, Twitter,
   Mail, Phone, MapPin, Heart, Star, X, Sun, Moon, ChevronLeft,
-  Loader2
+  Loader2, Search
 } from 'lucide-react'
 import Image from 'next/image'
 import CurrencyToggle from '@/components/CurrencyToggle'
 import { useCurrency } from '@/context/CurrencyContext'
+import { ProductCategory, PRODUCT_CATEGORIES, CATEGORY_SECTION_TITLES } from '@/lib/productCategories'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface ProductVariant {
@@ -26,6 +27,7 @@ interface Product {
   description: string
   image_url: string
   is_new_arrival?: boolean
+  category?: ProductCategory
   fragrance_notes?: { top?: string; heart?: string; base?: string }
   product_variants: ProductVariant[]
 }
@@ -66,6 +68,14 @@ interface Testimonial {
   text: string
 }
 
+const PLACEHOLDER_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><rect width="400" height="400" fill="#e5e0d8"/></svg>'
+const PLACEHOLDER_IMAGE =
+  'data:image/svg+xml;base64,' +
+  (typeof window === 'undefined'
+    ? Buffer.from(PLACEHOLDER_SVG).toString('base64')
+    : window.btoa(PLACEHOLDER_SVG))
+
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function HomePage() {
   const { formatPrice, currency } = useCurrency()
@@ -90,6 +100,8 @@ export default function HomePage() {
   const [favorites, setFavorites]         = useState<string[]>([])
   const [selectedVariants, setSelectedVariants] = useState<{ [productId: string]: string }>({})
   const [customerType, setCustomerType]   = useState<'regular' | 'reseller'>('regular')
+  const [isSearchOpen, setIsSearchOpen]   = useState(false)
+  const [searchQuery, setSearchQuery]     = useState('')
 
   // Cart state
   const [cart, setCart]                   = useState<CartItem[]>([])
@@ -246,6 +258,26 @@ export default function HomePage() {
     setFavorites(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
   }
 
+  const allProducts = [...newArrivals, ...products]
+  const searchResults = searchQuery.trim()
+    ? allProducts.filter(p => {
+        const q = searchQuery.trim().toLowerCase()
+        const haystack = [
+          p.name,
+          p.description,
+          p.fragrance_notes?.top,
+          p.fragrance_notes?.heart,
+          p.fragrance_notes?.base,
+        ]
+          .map(v => String(v || '').toLowerCase())
+          .join(' ')
+        return haystack.includes(q)
+      })
+    : []
+
+  const productsByCategory = (category: ProductCategory) =>
+    products.filter(p => (p.category || 'perfume') === category)
+
   const getSubtotal    = () => cart.reduce((t, i) => t + i.price * i.quantity, 0)
   const qualifiesForFreeDelivery = () =>
     getSubtotal() >= parseFloat(settings.free_delivery_threshold || '800')
@@ -390,6 +422,16 @@ export default function HomePage() {
                 {customerType === 'reseller' ? '★ Reseller' : 'Regular'}
               </button>
 
+              {/* Search */}
+              <button
+                onClick={() => setIsSearchOpen(v => !v)}
+                aria-label="Search products"
+                className="flex items-center justify-center w-9 h-9 transition-colors"
+                style={{ color: isSearchOpen ? 'var(--gold)' : 'var(--text)' }}
+              >
+                <Search className="h-5 w-5" />
+              </button>
+
               {/* Currency */}
               <CurrencyToggle />
 
@@ -425,6 +467,72 @@ export default function HomePage() {
           </div>
         </div>
       </header>
+
+      {/* ─── Search Panel ────────────────────────────────────────────────── */}
+      {isSearchOpen && (
+        <div
+          className="sticky top-20 z-30 border-b"
+          style={{ background: 'var(--header-bg)', borderColor: 'var(--border)', backdropFilter: 'blur(16px)' }}
+        >
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="relative">
+              <Search
+                className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4"
+                style={{ color: 'var(--text-faint)' }}
+              />
+              <input
+                type="text"
+                autoFocus
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Search for a fragrance, e.g. Hypnotic Poison..."
+                className="w-full pl-11 pr-11 py-3 text-sm outline-none transition-colors"
+                style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)' }}
+              />
+              <button
+                onClick={() => { setIsSearchOpen(false); setSearchQuery('') }}
+                aria-label="Close search"
+                className="absolute right-4 top-1/2 -translate-y-1/2"
+                style={{ color: 'var(--text-faint)' }}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {searchQuery.trim() && (
+              <div className="mt-4">
+                <p className="text-xs mb-4" style={{ color: 'var(--text-faint)' }}>
+                  {searchResults.length} result{searchResults.length !== 1 ? 's' : ''} for &ldquo;{searchQuery}&rdquo;
+                </p>
+                {searchResults.length === 0 ? (
+                  <p className="text-sm py-8 text-center" style={{ color: 'var(--text-muted)' }}>
+                    No fragrances found. Try a different search.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 md:gap-8 pb-4">
+                    {searchResults.map((product, i) => (
+                      <ProductCard
+                        key={product.id}
+                        product={product}
+                        selectedVariants={selectedVariants}
+                        setSelectedVariants={setSelectedVariants}
+                        getSelectedVariant={getSelectedVariant}
+                        getEffectivePrice={getEffectivePrice}
+                        customerType={customerType}
+                        favorites={favorites}
+                        toggleFavorite={toggleFavorite}
+                        addToCart={addToCart}
+                        setIsCartOpen={setIsCartOpen}
+                        delay={i * 50}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ─── Hero ────────────────────────────────────────────────────────── */}
       <section
@@ -472,8 +580,8 @@ export default function HomePage() {
               style={{ color: 'var(--text-muted)', fontWeight: 400 }}
             >
               Curated fragrances for those who understand that a signature scent
-              is the most intimate expression of self. Available in 35ml, 50ml,
-              and 100ml.
+              is the most intimate expression of self. Perfumes, home diffusers,
+              tissue oils and body mists — thoughtfully sized for every ritual.
             </p>
 
             {customerType === 'reseller' && settings.bulk_discount_enabled === 'true' && (
@@ -573,7 +681,7 @@ export default function HomePage() {
         </section>
       )}
 
-      {/* ─── Main Collection ──────────────────────────────────────────────── */}
+      {/* ─── Main Collection (by category) ──────────────────────────────── */}
       <section className="py-12 md:py-24" id="collection" style={{ background: 'var(--bg)' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mb-8 md:mb-16">
@@ -587,7 +695,7 @@ export default function HomePage() {
             <div className="gold-line-left mt-4" />
           </div>
 
-          {products.length === 0 ? (
+          {products.length === 0 && (
             <div className="text-center py-20">
               <p className="font-display text-2xl mb-2" style={{ color: 'var(--text-muted)', fontWeight: 300 }}>
                 Coming Soon
@@ -596,26 +704,41 @@ export default function HomePage() {
                 New fragrances are being added to the collection.
               </p>
             </div>
-          ) : (
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 md:gap-8">
-              {products.map((product, i) =>
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  selectedVariants={selectedVariants}
-                  setSelectedVariants={setSelectedVariants}
-                  getSelectedVariant={getSelectedVariant}
-                  getEffectivePrice={getEffectivePrice}
-                  customerType={customerType}
-                  favorites={favorites}
-                  toggleFavorite={toggleFavorite}
-                  addToCart={addToCart}
-                  setIsCartOpen={setIsCartOpen}
-                  delay={i * 100}
-                />
-              )}
-            </div>
           )}
+
+          {PRODUCT_CATEGORIES.map((category) => {
+            const categoryProducts = productsByCategory(category)
+            if (categoryProducts.length === 0) return null
+
+            return (
+              <div key={category} className="mb-12 md:mb-20 last:mb-0">
+                <h4
+                  className="font-display text-xl sm:text-2xl mb-6 md:mb-8"
+                  style={{ color: 'var(--gold)', fontWeight: 400 }}
+                >
+                  {CATEGORY_SECTION_TITLES[category]}
+                </h4>
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 md:gap-8">
+                  {categoryProducts.map((product, i) =>
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      selectedVariants={selectedVariants}
+                      setSelectedVariants={setSelectedVariants}
+                      getSelectedVariant={getSelectedVariant}
+                      getEffectivePrice={getEffectivePrice}
+                      customerType={customerType}
+                      favorites={favorites}
+                      toggleFavorite={toggleFavorite}
+                      addToCart={addToCart}
+                      setIsCartOpen={setIsCartOpen}
+                      delay={i * 100}
+                    />
+                  )}
+                </div>
+              </div>
+            )
+          })}
         </div>
       </section>
 
@@ -682,7 +805,7 @@ export default function HomePage() {
               >
                 {newArrivals[0] || products[0] ? (
                   <Image
-                    src={(newArrivals[0] || products[0]).image_url}
+                    src={(newArrivals[0] || products[0]).image_url || PLACEHOLDER_IMAGE}
                     alt="Aromatic Scents"
                     fill
                     className="object-cover"
@@ -986,7 +1109,7 @@ export default function HomePage() {
                         >
                           <div className="w-14 h-14 flex-shrink-0 overflow-hidden" style={{ border: '1px solid var(--border)' }}>
                             <Image
-                              src={item.image_url}
+                              src={item.image_url || PLACEHOLDER_IMAGE}
                               alt={item.name}
                               width={56} height={56}
                               className="w-full h-full object-cover"
@@ -1331,7 +1454,7 @@ function ProductCard({
       {/* ── Image ── */}
       <div className="relative aspect-square sm:aspect-[3/4] overflow-hidden">
         <Image
-          src={product.image_url}
+          src={product.image_url || PLACEHOLDER_IMAGE}
           alt={product.name}
           fill
           className="object-cover transition-transform duration-700 group-hover:scale-105"
