@@ -7,6 +7,7 @@ import {
   isValidBobPayIP,
   type BobPayWebhookPayload,
 } from '@/lib/bobpay'
+import { sendOrderNotificationEmails } from '@/lib/email'
 
 export async function POST(request: NextRequest) {
   let payload: BobPayWebhookPayload | null = null
@@ -129,12 +130,22 @@ async function handleSuccessfulPayment(orderId: string) {
   try {
     const order = await prisma.order.findUnique({
       where: { id: orderId },
-      select: { items: true },
+      select: {
+        items: true,
+        customPaymentId: true,
+        customerEmail: true,
+        customerPhone: true,
+        deliveryAddress: true,
+        courierOption: true,
+        subtotal: true,
+        deliveryCost: true,
+        totalAmount: true,
+      },
     })
 
     if (!order?.items) return
 
-    let items: Array<{ variantId: string; quantity: number }> = []
+    let items: Array<{ variantId: string; name: string; size: number; price: number; quantity: number }> = []
     try {
       const parsed = JSON.parse(order.items)
       items = Array.isArray(parsed) ? parsed : []
@@ -151,6 +162,18 @@ async function handleSuccessfulPayment(orderId: string) {
         })
       }
     }
+
+    await sendOrderNotificationEmails({
+      customPaymentId:  order.customPaymentId,
+      customerEmail:    order.customerEmail,
+      customerPhone:    order.customerPhone,
+      deliveryAddress:  order.deliveryAddress,
+      courierOption:    order.courierOption,
+      items,
+      subtotal:         order.subtotal,
+      deliveryCost:     order.deliveryCost,
+      totalAmount:      order.totalAmount,
+    })
   } catch (error) {
     console.error('Error in handleSuccessfulPayment:', error)
   }
