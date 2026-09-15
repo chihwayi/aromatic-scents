@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import {
   ShoppingBag, Plus, Minus, Facebook, Instagram, Twitter,
   Mail, Phone, MapPin, Heart, Star, X, Sun, Moon, ChevronLeft,
@@ -1447,6 +1448,13 @@ function ProductCard({
   const isFav            = favorites.includes(product.id)
   const [showDetails, setShowDetails] = useState(false)
 
+  useEffect(() => {
+    if (!showDetails) return
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prevOverflow }
+  }, [showDetails])
+
   return (
     <div
       className="card group relative flex flex-col animate-fade-in-up"
@@ -1614,7 +1622,7 @@ function ProductCard({
       </div>
 
       {/* ── Description / Details Full-Screen Overlay ── */}
-      {showDetails && (
+      {showDetails && typeof document !== 'undefined' && createPortal(
         <div
           className="fixed inset-0 z-50 overflow-y-auto"
           style={{ background: 'var(--surface)' }}
@@ -1701,7 +1709,8 @@ function ProductCard({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )
