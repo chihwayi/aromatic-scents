@@ -1445,6 +1445,7 @@ function ProductCard({
   const isOutOfStock     = !selectedVariant || selectedVariant.stock_quantity === 0
   const isLowStock       = selectedVariant && selectedVariant.stock_quantity > 0 && selectedVariant.stock_quantity <= 5
   const isFav            = favorites.includes(product.id)
+  const [showDetails, setShowDetails] = useState(false)
 
   return (
     <div
@@ -1452,7 +1453,10 @@ function ProductCard({
       style={{ animationDelay: `${delay}ms` }}
     >
       {/* ── Image ── */}
-      <div className="relative aspect-square sm:aspect-[3/4] overflow-hidden">
+      <div
+        className="relative aspect-square sm:aspect-[3/4] overflow-hidden cursor-pointer"
+        onClick={() => setShowDetails(true)}
+      >
         <Image
           src={product.image_url || PLACEHOLDER_IMAGE}
           alt={product.name}
@@ -1494,7 +1498,7 @@ function ProductCard({
 
         {/* Favourite */}
         <button
-          onClick={() => toggleFavorite(product.id)}
+          onClick={(e) => { e.stopPropagation(); toggleFavorite(product.id) }}
           className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center transition-all duration-300"
           style={{
             background: 'rgba(255,255,255,0.9)',
@@ -1538,18 +1542,20 @@ function ProductCard({
       {/* ── Card Body ── */}
       <div className="flex flex-col flex-1 p-3 sm:p-6">
         <h3
-          className="font-display text-base sm:text-2xl mb-1"
+          className="font-display text-base sm:text-2xl mb-1 cursor-pointer"
           style={{ color: 'var(--text)', fontWeight: 500, lineHeight: 1.2 }}
+          onClick={() => setShowDetails(true)}
         >
           {product.name}
         </h3>
         <div className="gold-line-left my-3" style={{ width: '2rem' }} />
-        <p
-          className="text-xs leading-relaxed mb-3 sm:mb-5"
-          style={{ color: 'var(--text-muted)', fontWeight: 400, whiteSpace: 'pre-line' }}
+        <button
+          onClick={() => setShowDetails(true)}
+          className="text-xs mb-3 sm:mb-5 text-left w-fit"
+          style={{ color: 'var(--gold)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 500 }}
         >
-          {product.description}
-        </p>
+          View Description
+        </button>
 
         {/* Size selector */}
         <div className="mb-3 sm:mb-5">
@@ -1606,6 +1612,102 @@ function ProductCard({
           <span>{isOutOfStock ? 'Out of Stock' : 'Add to Cart'}</span>
         </button>
       </div>
+
+      {/* ── Description / Details Modal ── */}
+      {showDetails && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center px-4"
+          style={{ background: 'rgba(0,0,0,0.6)' }}
+          onClick={() => setShowDetails(false)}
+        >
+          <div
+            className="relative w-full max-w-md max-h-[85vh] overflow-y-auto"
+            style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--card-shadow)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowDetails(false)}
+              className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center z-10"
+              style={{ background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(4px)' }}
+              aria-label="Close"
+            >
+              <X className="h-4 w-4" style={{ color: 'var(--text)' }} />
+            </button>
+
+            <div className="relative aspect-square sm:aspect-[3/4] overflow-hidden">
+              <Image
+                src={product.image_url || PLACEHOLDER_IMAGE}
+                alt={product.name}
+                fill
+                className="object-cover"
+              />
+            </div>
+
+            <div className="p-5 sm:p-6">
+              <h3
+                className="font-display text-xl sm:text-2xl mb-1"
+                style={{ color: 'var(--text)', fontWeight: 500, lineHeight: 1.2 }}
+              >
+                {product.name}
+              </h3>
+              <div className="gold-line-left my-3" style={{ width: '2rem' }} />
+
+              <p
+                className="text-sm leading-relaxed mb-5"
+                style={{ color: 'var(--text-muted)', fontWeight: 400, whiteSpace: 'pre-line' }}
+              >
+                {product.description}
+              </p>
+
+              {product.fragrance_notes && (
+                <div className="mb-5">
+                  <p className="section-label mb-2" style={{ color: 'var(--gold)' }}>
+                    Fragrance Notes
+                  </p>
+                  {product.fragrance_notes.top && (
+                    <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>
+                      <span style={{ color: 'var(--gold)' }}>Top · </span>
+                      {product.fragrance_notes.top}
+                    </p>
+                  )}
+                  {product.fragrance_notes.heart && (
+                    <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>
+                      <span style={{ color: 'var(--gold)' }}>Heart · </span>
+                      {product.fragrance_notes.heart}
+                    </p>
+                  )}
+                  {product.fragrance_notes.base && (
+                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                      <span style={{ color: 'var(--gold)' }}>Base · </span>
+                      {product.fragrance_notes.base}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {selectedVariant && effectivePrice && (
+                <div className="flex items-baseline gap-2 mb-5">
+                  <span
+                    className="font-display text-2xl"
+                    style={{ color: 'var(--gold)', fontWeight: 600 }}
+                  >
+                    {formatPrice(effectivePrice.price)}
+                  </span>
+                </div>
+              )}
+
+              <button
+                onClick={() => { addToCart(product); setIsCartOpen(true); setShowDetails(false) }}
+                disabled={isOutOfStock}
+                className="btn-gold w-full text-center"
+                style={{ opacity: isOutOfStock ? 0.4 : 1, cursor: isOutOfStock ? 'not-allowed' : 'pointer' }}
+              >
+                <span>{isOutOfStock ? 'Out of Stock' : 'Add to Cart'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
