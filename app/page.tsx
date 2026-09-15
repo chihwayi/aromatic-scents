@@ -1613,25 +1613,20 @@ function ProductCard({
         </button>
       </div>
 
-      {/* ── Description / Details Modal ── */}
+      {/* ── Description / Details Full-Screen Overlay ── */}
       {showDetails && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center px-4"
-          style={{ background: 'rgba(0,0,0,0.6)' }}
-          onClick={() => setShowDetails(false)}
+          className="fixed inset-0 z-50 overflow-y-auto"
+          style={{ background: 'var(--surface)' }}
         >
-          <div
-            className="relative w-full max-w-md max-h-[85vh] overflow-y-auto"
-            style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--card-shadow)' }}
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="relative w-full max-w-lg mx-auto min-h-screen">
             <button
               onClick={() => setShowDetails(false)}
-              className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center z-10"
+              className="fixed top-4 right-4 w-10 h-10 flex items-center justify-center z-10"
               style={{ background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(4px)' }}
               aria-label="Close"
             >
-              <X className="h-4 w-4" style={{ color: 'var(--text)' }} />
+              <X className="h-5 w-5" style={{ color: 'var(--text)' }} />
             </button>
 
             <div className="relative aspect-square sm:aspect-[3/4] overflow-hidden">
