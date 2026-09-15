@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { CheckCircle, Package } from 'lucide-react'
+import { useCurrency } from '@/context/CurrencyContext'
 
 interface Order {
   custom_payment_id: string
@@ -20,6 +21,7 @@ interface Order {
 
 export default function SuccessClient() {
   const searchParams = useSearchParams()
+  const { formatPrice } = useCurrency()
   const orderId = searchParams.get('order_id')
   const [order, setOrder] = useState<Order | null>(null)
   const [loading, setLoading] = useState(true)
@@ -124,13 +126,13 @@ export default function SuccessClient() {
                 {order.items?.map((item, i) => (
                   <div key={i} className="flex justify-between text-sm" style={{ color: 'var(--text-muted)' }}>
                     <span>{item.name} {item.size}ml × {item.quantity}</span>
-                    <span>R{(item.price * item.quantity).toFixed(2)}</span>
+                    <span>{formatPrice(item.price * item.quantity)}</span>
                   </div>
                 ))}
                 {order.include_delivery && (
                   <div className="flex justify-between text-sm" style={{ color: 'var(--text-muted)' }}>
                     <span>Delivery</span>
-                    <span>R{order.delivery_cost?.toFixed(2)}</span>
+                    <span>{formatPrice(order.delivery_cost || 0)}</span>
                   </div>
                 )}
                 <div
@@ -139,7 +141,7 @@ export default function SuccessClient() {
                 >
                   <span className="font-medium">Total Paid</span>
                   <span className="font-display text-xl" style={{ color: 'var(--gold)' }}>
-                    R{(order.paid_amount || order.total_amount)?.toFixed(2)}
+                    {formatPrice(order.paid_amount || order.total_amount || 0)}
                   </span>
                 </div>
                 {order.payment_method && (
