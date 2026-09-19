@@ -20,8 +20,8 @@ interface OrderEmailData {
 }
 
 const COURIER_LABELS: Record<string, string> = {
-  courier_guy_locker: 'Courier Guy Locker',
-  house_delivery: 'House Delivery',
+  courier_guy_locker: 'PUDO Locker',
+  house_delivery: 'House Delivery (Courier Guy / Internet Express / MTE Express)',
 }
 
 function formatItemsList(items: OrderItem[]): string {

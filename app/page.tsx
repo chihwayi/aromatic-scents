@@ -57,8 +57,11 @@ interface Settings {
 type CourierOption = '' | 'courier_guy_locker' | 'house_delivery'
 
 const COURIER_LABELS: Record<Exclude<CourierOption, ''>, string> = {
-  courier_guy_locker: 'Courier Guy Locker',
+  courier_guy_locker: 'PUDO Locker',
   house_delivery: 'House Delivery',
+}
+const COURIER_SUBLABELS: Partial<Record<Exclude<CourierOption, ''>, string>> = {
+  house_delivery: 'Courier Guy · Internet Express · MTE Express',
 }
 
 interface Testimonial {
@@ -990,17 +993,24 @@ export default function HomePage() {
             <p className="text-xs" style={{ color: 'var(--text-faint)' }}>
               © {new Date().getFullYear()} Aromatic Scents. All rights reserved.
             </p>
-            <div className="flex gap-6">
-              {['Privacy Policy', 'Terms of Service', 'Shipping Info'].map(l => (
+            <div className="flex flex-wrap justify-center gap-x-6 gap-y-2">
+              {[
+                { label: 'Terms & Conditions', href: '/legal/terms' },
+                { label: 'Privacy Policy', href: '/legal/privacy' },
+                { label: 'Returns & Refunds', href: '/legal/returns' },
+                { label: 'Delivery Policy', href: '/legal/delivery' },
+                { label: 'PAIA Manual', href: '/legal/paia-manual' },
+                { label: 'Inspired-By Fragrance', href: '/legal/inspired-by-fragrance' },
+              ].map(({ label, href }) => (
                 <a
-                  key={l}
-                  href="#"
+                  key={href}
+                  href={href}
                   className="text-xs transition-colors duration-200"
                   style={{ color: 'var(--text-faint)' }}
                   onMouseEnter={e => (e.currentTarget as HTMLAnchorElement).style.color = 'var(--gold)'}
                   onMouseLeave={e => (e.currentTarget as HTMLAnchorElement).style.color = 'var(--text-faint)'}
                 >
-                  {l}
+                  {label}
                 </a>
               ))}
             </div>
@@ -1206,8 +1216,15 @@ export default function HomePage() {
                               onChange={() => setCourierOption(option)}
                               className="w-4 h-4 accent-amber-500"
                             />
-                            <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                              {COURIER_LABELS[option]}
+                            <span className="flex flex-col">
+                              <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                                {COURIER_LABELS[option]}
+                              </span>
+                              {COURIER_SUBLABELS[option] && (
+                                <span className="text-xs" style={{ color: 'var(--text-faint)' }}>
+                                  {COURIER_SUBLABELS[option]}
+                                </span>
+                              )}
                             </span>
                           </span>
                           <span className="text-sm" style={{ color: qualifiesForFreeDelivery() ? 'var(--gold)' : 'var(--text)' }}>

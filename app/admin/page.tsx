@@ -104,8 +104,8 @@ interface Testimonial {
 }
 
 const COURIER_LABELS: Record<string, string> = {
-  courier_guy_locker: 'Courier Guy Locker',
-  house_delivery: 'House Delivery',
+  courier_guy_locker: 'PUDO Locker',
+  house_delivery: 'House Delivery (Courier Guy / Internet Express / MTE Express)',
 }
 
 const PLACEHOLDER_SVG =
@@ -695,7 +695,7 @@ export default function AdminPanel() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Courier Guy Locker Price (R)
+                PUDO Locker Price (R)
               </label>
               <input
                 type="number"
