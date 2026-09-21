@@ -1275,10 +1275,10 @@ export default function AdminPanel() {
                             </span>
                           </td>
                           <td className="px-6 py-4 text-gray-700 max-w-[180px] truncate">{order.customer_email}</td>
-                          <td className="px-6 py-4 max-w-[220px]">
+                          <td className="px-6 py-4 max-w-[260px]">
                             <div className="text-xs text-gray-600 space-y-0.5">
                               <div>{order.customer_phone || <span className="text-gray-400">No phone</span>}</div>
-                              <div className="truncate" title={order.delivery_address || ''}>
+                              <div className="whitespace-pre-line break-words">
                                 {order.delivery_address || <span className="text-gray-400">No address</span>}
                               </div>
                               {order.courier_option && (
