@@ -1274,7 +1274,7 @@ export default function AdminPanel() {
                               {order.custom_payment_id}
                             </span>
                           </td>
-                          <td className="px-6 py-4 text-gray-700 max-w-[180px] truncate">{order.customer_email}</td>
+                          <td className="px-6 py-4 text-gray-700 max-w-[200px] break-words">{order.customer_email}</td>
                           <td className="px-6 py-4 max-w-[260px]">
                             <div className="text-xs text-gray-600 space-y-0.5">
                               <div>{order.customer_phone || <span className="text-gray-400">No phone</span>}</div>
