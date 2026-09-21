@@ -118,19 +118,17 @@ export async function POST(request: NextRequest) {
 
     // ─── Create BobPay payment link ───────────────────────────────────────
     const bobpayResponse = await createPaymentLink({
-      recipient_account_code: BOBPAY_CONFIG.accountCode,
-      custom_payment_id:      customPaymentId,
-      email:                  customerEmail,
-      phone_number:           customerPhone || '',
-      amount:                 total,
-      item_name:              `Aromatic Scents Order — ${customPaymentId}`,
-      item_description:       itemDescription,
-      notify_url:             notifyUrl,
-      success_url:            successUrl,
-      pending_url:            pendingUrl,
-      cancel_url:             cancelUrl,
-      transacting_as_email:   customerEmail,
-      short_url:              false,
+      custom_payment_id: customPaymentId,
+      email:             customerEmail,
+      mobile_number:     customerPhone || '',
+      amount:            total,
+      item_name:         `Aromatic Scents Order — ${customPaymentId}`,
+      item_description:  itemDescription,
+      notify_url:        notifyUrl,
+      success_url:       successUrl,
+      pending_url:       pendingUrl,
+      cancel_url:        cancelUrl,
+      short_url:         false,
     })
 
     return NextResponse.json({

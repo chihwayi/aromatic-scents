@@ -19,16 +19,15 @@ export const BOBPAY_CONFIG = {
       : 'https://my.bobpay.co.za'
   },
 
-  // Static IPs that BobPay webhooks originate from
-  allowedWebhookIPs: ['13.246.115.225', '13.246.100.25'],
+  // Per BobPay docs: sandbox and production webhooks originate from different IPs.
+  allowedWebhookIPs: ['13.245.58.93', '13.246.100.25'],
 }
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 export interface BobPayCreateLinkPayload {
-  recipient_account_code: string
   custom_payment_id: string
   email: string
-  phone_number: string
+  mobile_number: string
   amount: number
   item_name: string
   item_description: string
@@ -36,7 +35,6 @@ export interface BobPayCreateLinkPayload {
   success_url: string
   pending_url: string
   cancel_url: string
-  transacting_as_email?: string
   short_url?: boolean
 }
 
@@ -80,23 +78,36 @@ export interface BobPayWebhookPayload {
   cancel_url: string
 }
 
+// ─── PHP-style urlencode (form encoding) ─────────────────────────────────────
+// BobPay's signature is computed server-side using PHP's urlencode(), which
+// encodes spaces as '+' and escapes a few characters (! ' ( ) *) that
+// encodeURIComponent leaves untouched. Both sides must match exactly.
+function phpUrlEncode(value: string): string {
+  return encodeURIComponent(value)
+    .replace(/%20/g, '+')
+    .replace(/[!'()*]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase())
+}
+
 // ─── Signature Verification (for incoming webhooks) ─────────────────────────
 export function verifyWebhookSignature(
   payload: BobPayWebhookPayload,
   passphrase: string
 ): boolean {
+  // The top-level recipient_account_code in the webhook payload is always
+  // empty — BobPay computes the signature using the real account code, so we
+  // must substitute our own configured account code here too.
   const pairs = [
-    `recipient_account_code=${encodeURIComponent(payload.recipient_account_code)}`,
-    `custom_payment_id=${encodeURIComponent(payload.custom_payment_id)}`,
-    `email=${encodeURIComponent(payload.email || '')}`,
-    `mobile_number=${encodeURIComponent(payload.mobile_number || '')}`,
+    `recipient_account_code=${phpUrlEncode(BOBPAY_CONFIG.accountCode)}`,
+    `custom_payment_id=${phpUrlEncode(payload.custom_payment_id)}`,
+    `email=${phpUrlEncode(payload.email || '')}`,
+    `mobile_number=${phpUrlEncode(payload.mobile_number || '')}`,
     `amount=${payload.amount.toFixed(2)}`,
-    `item_name=${encodeURIComponent(payload.item_name || '')}`,
-    `item_description=${encodeURIComponent(payload.item_description || '')}`,
-    `notify_url=${encodeURIComponent(payload.notify_url)}`,
-    `success_url=${encodeURIComponent(payload.success_url)}`,
-    `pending_url=${encodeURIComponent(payload.pending_url)}`,
-    `cancel_url=${encodeURIComponent(payload.cancel_url)}`,
+    `item_name=${phpUrlEncode(payload.item_name || '')}`,
+    `item_description=${phpUrlEncode(payload.item_description || '')}`,
+    `notify_url=${phpUrlEncode(payload.notify_url)}`,
+    `success_url=${phpUrlEncode(payload.success_url)}`,
+    `pending_url=${phpUrlEncode(payload.pending_url)}`,
+    `cancel_url=${phpUrlEncode(payload.cancel_url)}`,
   ]
   const signatureString = pairs.join('&') + `&passphrase=${passphrase}`
   const calculated = crypto.createHash('md5').update(signatureString).digest('hex')
@@ -112,7 +123,7 @@ export function isValidBobPayIP(ip: string): boolean {
 export async function createPaymentLink(
   payload: BobPayCreateLinkPayload
 ): Promise<BobPayLinkResponse> {
-  const res = await fetch(`${BOBPAY_CONFIG.apiBase}/payments/intents/link`, {
+  const res = await fetch(`${BOBPAY_CONFIG.apiBase}/v2/payments/intents/link`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -134,13 +145,19 @@ export async function validatePayment(
   webhookPayload: BobPayWebhookPayload
 ): Promise<boolean> {
   try {
-    const res = await fetch(`${BOBPAY_CONFIG.apiBase}/payments/intents/validate`, {
+    // The webhook's top-level recipient_account_code is always empty —
+    // substitute our own account code before sending it back for validation.
+    const validationPayload = {
+      ...webhookPayload,
+      recipient_account_code: BOBPAY_CONFIG.accountCode,
+    }
+    const res = await fetch(`${BOBPAY_CONFIG.apiBase}/v2/payments/intents/validate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${BOBPAY_CONFIG.apiKey}`,
       },
-      body: JSON.stringify(webhookPayload),
+      body: JSON.stringify(validationPayload),
     })
     return res.ok
   } catch {
