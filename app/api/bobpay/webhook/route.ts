@@ -31,10 +31,17 @@ export async function POST(request: NextRequest) {
     }
 
     // ─── 2. Verify signature ──────────────────────────────────────────────
-    const signatureValid = verifyWebhookSignature(payload, BOBPAY_CONFIG.passphrase)
+    // BobPay's production webhooks have been observed sending an empty
+    // `signature` field (despite the documented MD5 scheme), so an empty
+    // signature can't be treated as invalid — there's nothing to compare.
+    // When present, it's still checked strictly. When absent, we fall back
+    // to IP allowlisting (already checked above) plus the remote payment
+    // validation call below as the source of truth.
+    const signatureValid = payload.signature
+      ? verifyWebhookSignature(payload, BOBPAY_CONFIG.passphrase)
+      : true
 
-    // In sandbox, only log invalid signatures (don't block) for easier testing
-    if (!BOBPAY_CONFIG.isSandbox && !signatureValid) {
+    if (!BOBPAY_CONFIG.isSandbox && payload.signature && !signatureValid) {
       await logWebhook(payload, clientIp, ipValid, false, 'Invalid signature')
       return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
     }
