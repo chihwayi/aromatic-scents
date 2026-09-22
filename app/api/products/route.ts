@@ -23,6 +23,7 @@ interface ProductInput {
   image_url: string
   is_new_arrival?: boolean
   category?: string
+  gender?: string | null
   fragrance_notes?: FragranceNotesInput | null
 }
 
@@ -50,6 +51,7 @@ function toProductDTO(product: Product & { variants: ProductVariant[] }) {
     image_url:      product.imageUrl,
     is_new_arrival: product.isNewArrival,
     category:       product.category,
+    gender:         product.gender,
     fragrance_notes: product.fragranceNotes ? JSON.parse(product.fragranceNotes) : null,
     created_at:     product.createdAt.toISOString(),
     updated_at:     product.updatedAt.toISOString(),
@@ -92,6 +94,7 @@ export async function POST(request: NextRequest) {
         imageUrl:       product.image_url,
         isNewArrival:   product.is_new_arrival || false,
         category:       product.category || 'perfume',
+        gender:         product.gender || null,
         fragranceNotes: serializeFragranceNotes(product.fragrance_notes),
         variants: {
           create: (variants || []).map(v => ({
@@ -129,6 +132,7 @@ export async function PUT(request: NextRequest) {
           imageUrl:       product.image_url,
           isNewArrival:   product.is_new_arrival || false,
           category:       product.category || 'perfume',
+          gender:         product.gender || null,
           fragranceNotes: serializeFragranceNotes(product.fragrance_notes),
         },
       })

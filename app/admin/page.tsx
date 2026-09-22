@@ -8,8 +8,10 @@ import Link from 'next/link'
 import Image from 'next/image'
 import {
   ProductCategory,
+  ProductGender,
   PRODUCT_CATEGORIES,
   CATEGORY_LABELS,
+  GENDER_LABELS,
   ALLOWED_SIZES_BY_CATEGORY,
 } from '@/lib/productCategories'
 
@@ -35,6 +37,7 @@ interface Product {
   image_url: string
   is_new_arrival?: boolean
   category?: ProductCategory
+  gender?: ProductGender | null
   fragrance_notes?: FragranceNotes | null
   product_variants?: ProductVariant[]
 }
@@ -302,6 +305,7 @@ export default function AdminPanel() {
         image_url: product.image_url,
         is_new_arrival: product.is_new_arrival,
         category: product.category,
+        gender: product.category === 'perfume' ? (product.gender || 'unisex') : null,
         fragrance_notes: product.fragrance_notes,
       }
       const body = product.id
@@ -568,6 +572,22 @@ export default function AdminPanel() {
           </select>
           <p className="text-xs text-gray-500 mt-1">Changing this resets the available bottle sizes below.</p>
         </div>
+
+        {formData.category === 'perfume' && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Gender</label>
+            <select
+              value={formData.gender || 'unisex'}
+              onChange={(e) => setFormData({ ...formData, gender: e.target.value as ProductGender })}
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all duration-300"
+            >
+              {(['female', 'male', 'unisex'] as ProductGender[]).map(g => (
+                <option key={g} value={g}>{GENDER_LABELS[g]}</option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-500 mt-1">Determines which menu section (Female / Male / Unisex Fragrances) this perfume appears under.</p>
+          </div>
+        )}
 
         <div>
           <h3 className="text-lg font-medium text-gray-900 mb-4">Bottle Sizes & Pricing</h3>
@@ -1398,6 +1418,11 @@ export default function AdminPanel() {
                             <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full font-medium">
                               {CATEGORY_LABELS[product.category || 'perfume']}
                             </span>
+                            {product.category === 'perfume' && (
+                              <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full font-medium">
+                                {GENDER_LABELS[product.gender || 'unisex']}
+                              </span>
+                            )}
                             {product.is_new_arrival && (
                               <span className="px-2 py-1 bg-gradient-to-r from-rose-500 to-amber-500 text-white text-xs rounded-full font-medium">
                                 NEW

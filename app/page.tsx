@@ -10,7 +10,7 @@ import {
 import Image from 'next/image'
 import CurrencyToggle from '@/components/CurrencyToggle'
 import { useCurrency } from '@/context/CurrencyContext'
-import { ProductCategory, PRODUCT_CATEGORIES, CATEGORY_SECTION_TITLES } from '@/lib/productCategories'
+import { ProductCategory, ProductGender, MENU_SECTIONS } from '@/lib/productCategories'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface ProductVariant {
@@ -29,6 +29,7 @@ interface Product {
   image_url: string
   is_new_arrival?: boolean
   category?: ProductCategory
+  gender?: ProductGender | null
   fragrance_notes?: { top?: string; heart?: string; base?: string }
   product_variants: ProductVariant[]
 }
@@ -279,8 +280,15 @@ export default function HomePage() {
       })
     : []
 
-  const productsByCategory = (category: ProductCategory) =>
-    products.filter(p => (p.category || 'perfume') === category)
+  const productsForSection = (sectionId: string) => {
+    const section = MENU_SECTIONS.find(s => s.id === sectionId)
+    if (!section) return []
+    return products.filter(p => section.matches({ category: p.category || 'perfume', gender: p.gender }))
+  }
+
+  const scrollToSection = (id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 
   const getSubtotal    = () => cart.reduce((t, i) => t + i.price * i.quantity, 0)
   const qualifiesForFreeDelivery = () =>
@@ -710,20 +718,51 @@ export default function HomePage() {
             </div>
           )}
 
-          {PRODUCT_CATEGORIES.map((category) => {
-            const categoryProducts = productsByCategory(category)
-            if (categoryProducts.length === 0) return null
+          {/* ─── Category menu bar ─── */}
+          {products.length > 0 && (
+            <div
+              className="sticky top-20 z-20 -mx-4 px-4 sm:mx-0 sm:px-0 mb-10 md:mb-16 py-3 flex gap-2 overflow-x-auto"
+              style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}
+            >
+              {MENU_SECTIONS.filter(section => productsForSection(section.id).length > 0).map(section => (
+                <button
+                  key={section.id}
+                  onClick={() => scrollToSection(section.id)}
+                  className="flex-shrink-0 px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm whitespace-nowrap transition-colors"
+                  style={{
+                    border: '1px solid var(--border)',
+                    color: 'var(--text-muted)',
+                    letterSpacing: '0.04em',
+                  }}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--gold)'
+                    ;(e.currentTarget as HTMLButtonElement).style.color = 'var(--gold)'
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)'
+                    ;(e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)'
+                  }}
+                >
+                  {section.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {MENU_SECTIONS.map((section) => {
+            const sectionProducts = productsForSection(section.id)
+            if (sectionProducts.length === 0) return null
 
             return (
-              <div key={category} className="mb-12 md:mb-20 last:mb-0">
+              <div key={section.id} id={section.id} className="mb-12 md:mb-20 last:mb-0 scroll-mt-32">
                 <h4
                   className="font-display text-xl sm:text-2xl mb-6 md:mb-8"
                   style={{ color: 'var(--gold)', fontWeight: 400 }}
                 >
-                  {CATEGORY_SECTION_TITLES[category]}
+                  {section.label}
                 </h4>
                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 md:gap-8">
-                  {categoryProducts.map((product, i) =>
+                  {sectionProducts.map((product, i) =>
                     <ProductCard
                       key={product.id}
                       product={product}

@@ -22,7 +22,8 @@ model Product {
   description   String
   imageUrl      String
   isNewArrival  Boolean  @default(false)
-  category      String   @default("perfume") // perfume | home_diffuser | tissue_oil | body_mist
+  category      String   @default("perfume") // perfume | home_diffuser | tissue_oil | body_mist | car_diffuser | lotion
+  gender        String?  // female | male | unisex — only meaningful when category is "perfume"
   fragranceNotes String? // Stored as JSON string: { top, heart, base }
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
