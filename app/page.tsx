@@ -293,8 +293,6 @@ export default function HomePage() {
   // ─── Hero showcase products ───────────────────────────────────────────────
   const heroFeatured  = newArrivals[0] || products[0] || null
   const heroSecondary = (newArrivals[1] || products.find(p => p.id !== heroFeatured?.id)) || null
-  const heroFeaturedVariant = heroFeatured ? getSelectedVariant(heroFeatured) : null
-  const heroFeaturedPrice   = heroFeaturedVariant ? getEffectivePrice(heroFeaturedVariant, 1) : null
 
   const getSubtotal    = () => cart.reduce((t, i) => t + i.price * i.quantity, 0)
   const qualifiesForFreeDelivery = () =>
@@ -696,16 +694,9 @@ export default function HomePage() {
                       >
                         {heroFeatured.name}
                       </p>
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-xs" style={{ color: 'rgba(255,255,255,0.75)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                          Eau de Parfum
-                        </p>
-                        {heroFeaturedPrice && (
-                          <p className="font-display text-lg" style={{ color: 'var(--gold-light)', fontWeight: 500 }}>
-                            {formatPrice(heroFeaturedPrice.price)}
-                          </p>
-                        )}
-                      </div>
+                      <p className="text-xs" style={{ color: 'rgba(255,255,255,0.75)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                        Eau de Parfum
+                      </p>
                     </div>
                   </>
                 ) : (
@@ -726,7 +717,7 @@ export default function HomePage() {
               {/* Offset secondary image for depth/collage effect */}
               {heroSecondary && (
                 <div
-                  className="hidden sm:block absolute -bottom-8 -left-8 w-32 h-40 lg:w-40 lg:h-52 z-10"
+                  className="hidden sm:block absolute top-1/2 -translate-y-1/2 -left-8 w-28 h-36 lg:w-36 lg:h-48 z-10"
                   style={{ border: '4px solid var(--bg)', boxShadow: 'var(--card-shadow-hover)' }}
                 >
                   <Image
