@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
+import PageBanner from './PageBanner'
 
 export type ContentBlock =
   | { type: 'p'; text: string }
@@ -70,11 +71,15 @@ export default function ContentPage({
   title,
   subtitle,
   sections,
+  bannerIndex,
+  bannerCaption,
 }: {
   label: string
   title: string
   subtitle?: string
   sections: ContentSection[]
+  bannerIndex?: number
+  bannerCaption?: string
 }) {
   return (
     <div className="min-h-screen" style={{ background: 'var(--bg)' }}>
@@ -87,6 +92,10 @@ export default function ContentPage({
           <ChevronLeft className="h-3.5 w-3.5" />
           Back to Aromatic Scents
         </Link>
+
+        {typeof bannerIndex === 'number' && (
+          <PageBanner index={bannerIndex} caption={bannerCaption} />
+        )}
 
         <p className="section-label mb-3" style={{ color: 'var(--gold)' }}>
           {label}

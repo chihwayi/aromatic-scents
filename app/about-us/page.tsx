@@ -23,6 +23,8 @@ export default function AboutUsPage() {
       label="About Us"
       title="Fragrance That Fits Your World"
       sections={sections}
+      bannerIndex={0}
+      bannerCaption="Fragrance for every mood, moment and journey"
     />
   )
 }

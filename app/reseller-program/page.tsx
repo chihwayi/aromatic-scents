@@ -43,6 +43,8 @@ export default function ResellerProgramPage() {
       label="Reseller Program"
       title="Build Your Own Fragrance Business"
       sections={sections}
+      bannerIndex={2}
+      bannerCaption="Choose → Order → Sell → Grow"
     />
   )
 }

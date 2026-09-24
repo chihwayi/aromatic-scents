@@ -25,6 +25,8 @@ export default function OurStoryPage() {
       label="Our Story"
       title="From a Passion for Fragrance to a Growing Brand"
       sections={sections}
+      bannerIndex={1}
+      bannerCaption="Soothe. Uplift. Inspire."
     />
   )
 }

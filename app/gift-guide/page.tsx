@@ -55,6 +55,8 @@ export default function GiftGuidePage() {
       label="Gift Guide"
       title="Give the Gift of Fragrance"
       sections={sections}
+      bannerIndex={4}
+      bannerCaption="A thoughtful fragrance can say more than words"
     />
   )
 }

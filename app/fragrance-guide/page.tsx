@@ -72,6 +72,8 @@ export default function FragranceGuidePage() {
       label="Fragrance Guide"
       title="Find a Fragrance That Feels Like You"
       sections={sections}
+      bannerIndex={3}
+      bannerCaption="There are no rules — just the scent that feels like you"
     />
   )
 }
