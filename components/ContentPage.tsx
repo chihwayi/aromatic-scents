@@ -6,6 +6,7 @@ export type ContentBlock =
   | { type: 'ul'; items: string[] }
   | { type: 'h2'; text: string }
   | { type: 'quote'; text: string }
+  | { type: 'link'; text: string; href: string }
 
 export interface ContentSection {
   heading?: string
@@ -52,6 +53,14 @@ function Block({ block }: { block: ContentBlock }) {
         >
           {block.text}
         </p>
+      )
+    case 'link':
+      return (
+        <div className="my-8 text-center">
+          <Link href={block.href} className="btn-outline-gold inline-block">
+            <span>{block.text}</span>
+          </Link>
+        </div>
       )
   }
 }
