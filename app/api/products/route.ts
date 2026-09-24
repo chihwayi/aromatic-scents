@@ -43,12 +43,29 @@ interface UpdateProductRequest {
   variants: ProductVariantInput[]
 }
 
+// Products with a base64 data: URI image get rewritten to point at the
+// dedicated image-serving endpoint instead of embedding the full image
+// inline — otherwise the whole product list JSON balloons to several MB
+// and the page can't render anything until all images finish downloading.
+// External http(s) image URLs are left untouched since they're already
+// served efficiently by whatever host they point to.
+function imageUrlFor(product: Product): string {
+  if (product.imageUrl.startsWith('data:')) {
+    return `/api/products/${product.id}/image?v=${product.updatedAt.getTime()}`
+  }
+  return product.imageUrl
+}
+
+function isInternalImageRef(id: string, url: string): boolean {
+  return url.startsWith(`/api/products/${id}/image`)
+}
+
 function toProductDTO(product: Product & { variants: ProductVariant[] }) {
   return {
     id:             product.id,
     name:           product.name,
     description:    product.description,
-    image_url:      product.imageUrl,
+    image_url:      imageUrlFor(product),
     is_new_arrival: product.isNewArrival,
     category:       product.category,
     gender:         product.gender,
@@ -123,13 +140,20 @@ export async function PUT(request: NextRequest) {
   try {
     const { id, product, variants }: UpdateProductRequest = await request.json()
 
+    // The product list API rewrites base64 images to a reference URL like
+    // /api/products/{id}/image so the JSON payload stays small. If the admin
+    // saves a product without picking a new image, that reference URL comes
+    // right back in this request — it must NOT overwrite the real stored
+    // image with a URL string, so we just leave imageUrl untouched here.
+    const imageUnchanged = isInternalImageRef(id, product.image_url)
+
     const updated = await prisma.$transaction(async (tx) => {
       await tx.product.update({
         where: { id },
         data: {
           name:           product.name,
           description:    product.description,
-          imageUrl:       product.image_url,
+          ...(imageUnchanged ? {} : { imageUrl: product.image_url }),
           isNewArrival:   product.is_new_arrival || false,
           category:       product.category || 'perfume',
           gender:         product.gender || null,
