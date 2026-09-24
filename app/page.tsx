@@ -290,6 +290,12 @@ export default function HomePage() {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
+  // ─── Hero showcase products ───────────────────────────────────────────────
+  const heroFeatured  = newArrivals[0] || products[0] || null
+  const heroSecondary = (newArrivals[1] || products.find(p => p.id !== heroFeatured?.id)) || null
+  const heroFeaturedVariant = heroFeatured ? getSelectedVariant(heroFeatured) : null
+  const heroFeaturedPrice   = heroFeaturedVariant ? getEffectivePrice(heroFeaturedVariant, 1) : null
+
   const getSubtotal    = () => cart.reduce((t, i) => t + i.price * i.quantity, 0)
   const qualifiesForFreeDelivery = () =>
     getSubtotal() >= parseFloat(settings.free_delivery_threshold || '800')
@@ -548,105 +554,191 @@ export default function HomePage() {
 
       {/* ─── Hero ────────────────────────────────────────────────────────── */}
       <section
-        className="relative min-h-[60vh] md:min-h-[92vh] flex items-center overflow-hidden"
+        className="relative overflow-hidden"
         style={{ background: 'var(--bg)' }}
       >
-        {/* Decorative gold circles */}
-        <div
-          className="absolute top-1/4 right-[8%] w-72 h-72 rounded-full pointer-events-none animate-float"
-          style={{ border: '1px solid var(--border-strong)', opacity: 0.5 }}
-        />
-        <div
-          className="absolute bottom-1/4 right-[12%] w-48 h-48 rounded-full pointer-events-none animate-float anim-delay-200"
-          style={{ border: '1px solid var(--border)', opacity: 0.35 }}
-        />
-        <div
-          className="absolute top-1/3 right-[15%] w-6 h-6 rounded-full animate-float anim-delay-300"
-          style={{ background: 'var(--gold)', opacity: 0.4 }}
-        />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full pt-10 pb-12 md:pt-16 md:pb-24">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
+            {/* ── Text column ── */}
+            <div className="relative z-10 order-2 lg:order-1">
+              <p className="section-label mb-6 md:mb-8 animate-fade-in-up">
+                Premium Fragrances · South Africa
+              </p>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full pt-6 pb-10 md:pt-12 md:pb-20">
-          <div className="max-w-2xl">
-            <p className="section-label mb-8 animate-fade-in-up">
-              Premium Fragrances · South Africa
-            </p>
-
-            <h2
-              className="font-display leading-none mb-4 sm:mb-8 animate-fade-in-up anim-delay-100"
-              style={{
-                color: 'var(--text)',
-                fontWeight: 400,
-                fontSize: 'clamp(2.5rem, 7vw, 6.5rem)',
-                lineHeight: 1.05,
-              }}
-            >
-              The Art
-              <br />
-              <em style={{ color: 'var(--gold)', fontStyle: 'italic' }}>of Scent</em>
-            </h2>
-
-            <div className="gold-line mb-4 sm:mb-8 animate-fade-in-up anim-delay-200" />
-
-            <p
-              className="text-sm sm:text-lg leading-relaxed mb-6 sm:mb-10 max-w-md animate-fade-in-up anim-delay-300"
-              style={{ color: 'var(--text-muted)', fontWeight: 400 }}
-            >
-              Curated fragrances for those who understand that a signature scent
-              is the most intimate expression of self. Perfumes, home diffusers,
-              tissue oils and body mists — thoughtfully sized for every ritual.
-            </p>
-
-            {customerType === 'reseller' && settings.bulk_discount_enabled === 'true' && (
-              <div
-                className="inline-flex items-center gap-3 px-4 py-2.5 mb-10 text-sm animate-fade-in-up anim-delay-300"
-                style={{ border: '1px solid var(--gold)', color: 'var(--gold)', background: 'var(--accent-light)' }}
+              <h2
+                className="font-display leading-none mb-4 sm:mb-8 animate-fade-in-up anim-delay-100"
+                style={{
+                  color: 'var(--text)',
+                  fontWeight: 400,
+                  fontSize: 'clamp(2.5rem, 6vw, 5.5rem)',
+                  lineHeight: 1.05,
+                }}
               >
-                <Star className="h-3.5 w-3.5 fill-current" />
-                <span style={{ letterSpacing: '0.08em' }}>Reseller pricing is active</span>
-              </div>
-            )}
+                The Art
+                <br />
+                <em style={{ color: 'var(--gold)', fontStyle: 'italic' }}>of Scent</em>
+              </h2>
 
-            <div className="flex flex-wrap gap-4 animate-fade-in-up anim-delay-400">
-              <a
-                href="#collection"
-                className="btn-gold inline-block"
-                style={{ minWidth: '180px', textAlign: 'center' }}
-              >
-                <span>Shop Collection</span>
-              </a>
-              <a
-                href={whatsappUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn-outline-gold inline-block"
-                style={{ minWidth: '160px', textAlign: 'center' }}
-              >
-                <span>WhatsApp Us</span>
-              </a>
-            </div>
-          </div>
+              <div className="gold-line-left mb-4 sm:mb-8 animate-fade-in-up anim-delay-200" />
 
-          {/* Feature pills */}
-          <div className="flex flex-wrap gap-4 mt-8 md:mt-16 animate-fade-in-up anim-delay-500">
-            {[
-              { label: 'Multiple Sizes', sub: '35ml · 50ml · 100ml' },
-              { label: 'Bulk Discounts', sub: 'For resellers & wholesale' },
-              { label: 'Nationwide Delivery', sub: 'Fast & insured shipping' },
-            ].map(f => (
-              <div
-                key={f.label}
-                className="flex items-center gap-3 px-4 py-3"
-                style={{ border: '1px solid var(--border)', background: 'var(--surface)' }}
+              <p
+                className="text-sm sm:text-lg leading-relaxed mb-6 sm:mb-10 max-w-md animate-fade-in-up anim-delay-300"
+                style={{ color: 'var(--text-muted)', fontWeight: 400 }}
               >
-                <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: 'var(--gold)' }} />
-                <div>
-                  <div className="text-xs font-medium" style={{ color: 'var(--text)', letterSpacing: '0.06em' }}>
-                    {f.label}
-                  </div>
-                  <div className="text-xs" style={{ color: 'var(--text-faint)' }}>{f.sub}</div>
+                Curated fragrances for those who understand that a signature scent
+                is the most intimate expression of self. Perfumes, home diffusers,
+                tissue oils and body mists — thoughtfully sized for every ritual.
+              </p>
+
+              {customerType === 'reseller' && settings.bulk_discount_enabled === 'true' && (
+                <div
+                  className="inline-flex items-center gap-3 px-4 py-2.5 mb-10 text-sm animate-fade-in-up anim-delay-300"
+                  style={{ border: '1px solid var(--gold)', color: 'var(--gold)', background: 'var(--accent-light)' }}
+                >
+                  <Star className="h-3.5 w-3.5 fill-current" />
+                  <span style={{ letterSpacing: '0.08em' }}>Reseller pricing is active</span>
                 </div>
+              )}
+
+              <div className="flex flex-wrap gap-4 mb-10 md:mb-16 animate-fade-in-up anim-delay-400">
+                <a
+                  href="#collection"
+                  className="btn-gold inline-block"
+                  style={{ minWidth: '180px', textAlign: 'center' }}
+                >
+                  <span>Shop Collection</span>
+                </a>
+                <a
+                  href={whatsappUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-outline-gold inline-block"
+                  style={{ minWidth: '160px', textAlign: 'center' }}
+                >
+                  <span>WhatsApp Us</span>
+                </a>
               </div>
-            ))}
+
+              {/* Feature pills */}
+              <div className="flex flex-wrap gap-4 animate-fade-in-up anim-delay-500">
+                {[
+                  { label: 'Multiple Sizes', sub: '35ml · 50ml · 100ml' },
+                  { label: 'Bulk Discounts', sub: 'For resellers & wholesale' },
+                  { label: 'Nationwide Delivery', sub: 'Fast & insured shipping' },
+                ].map(f => (
+                  <div
+                    key={f.label}
+                    className="flex items-center gap-3 px-4 py-3"
+                    style={{ border: '1px solid var(--border)', background: 'var(--surface)' }}
+                  >
+                    <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: 'var(--gold)' }} />
+                    <div>
+                      <div className="text-xs font-medium" style={{ color: 'var(--text)', letterSpacing: '0.06em' }}>
+                        {f.label}
+                      </div>
+                      <div className="text-xs" style={{ color: 'var(--text-faint)' }}>{f.sub}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* ── Image column ── */}
+            <div className="relative order-1 lg:order-2 animate-fade-in anim-delay-200">
+              {/* Decorative gold ring, halo behind the image */}
+              <div
+                className="absolute -top-8 -right-8 w-40 h-40 sm:w-56 sm:h-56 rounded-full pointer-events-none animate-float"
+                style={{ border: '1px solid var(--border-strong)', opacity: 0.5 }}
+              />
+              <div
+                className="absolute top-1/2 -right-4 w-5 h-5 rounded-full pointer-events-none animate-float anim-delay-300"
+                style={{ background: 'var(--gold)', opacity: 0.5 }}
+              />
+
+              {/* Main showcase image */}
+              <div
+                className="relative aspect-[4/5] max-w-md mx-auto lg:max-w-none"
+                style={{ border: '1px solid var(--border)', boxShadow: 'var(--card-shadow-hover)' }}
+              >
+                {heroFeatured ? (
+                  <>
+                    <Image
+                      src={heroFeatured.image_url || PLACEHOLDER_IMAGE}
+                      alt={heroFeatured.name}
+                      fill
+                      priority
+                      sizes="(max-width: 1024px) 90vw, 45vw"
+                      className="object-cover"
+                    />
+                    <div
+                      className="absolute inset-0"
+                      style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.55) 0%, transparent 55%)' }}
+                    />
+                    {newArrivals.length > 0 && heroFeatured === newArrivals[0] && (
+                      <div
+                        className="absolute top-4 left-4 px-3 py-1 text-xs"
+                        style={{
+                          background: 'var(--gold)',
+                          color: '#fff',
+                          letterSpacing: '0.15em',
+                          textTransform: 'uppercase',
+                          fontWeight: 500,
+                          fontSize: '0.65rem',
+                        }}
+                      >
+                        New Arrival
+                      </div>
+                    )}
+                    <div className="absolute bottom-6 left-6 right-6">
+                      <p
+                        className="font-display text-white text-xl sm:text-2xl mb-1"
+                        style={{ fontWeight: 400 }}
+                      >
+                        {heroFeatured.name}
+                      </p>
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-xs" style={{ color: 'rgba(255,255,255,0.75)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                          Eau de Parfum
+                        </p>
+                        {heroFeaturedPrice && (
+                          <p className="font-display text-lg" style={{ color: 'var(--gold-light)', fontWeight: 500 }}>
+                            {formatPrice(heroFeaturedPrice.price)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div
+                    className="absolute inset-0 flex items-center justify-center"
+                    style={{ background: 'var(--surface-alt)' }}
+                  >
+                    <span
+                      className="font-display text-7xl"
+                      style={{ color: 'var(--gold)', opacity: 0.3, fontWeight: 300 }}
+                    >
+                      A
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Offset secondary image for depth/collage effect */}
+              {heroSecondary && (
+                <div
+                  className="hidden sm:block absolute -bottom-8 -left-8 w-32 h-40 lg:w-40 lg:h-52 z-10"
+                  style={{ border: '4px solid var(--bg)', boxShadow: 'var(--card-shadow-hover)' }}
+                >
+                  <Image
+                    src={heroSecondary.image_url || PLACEHOLDER_IMAGE}
+                    alt={heroSecondary.name}
+                    fill
+                    sizes="200px"
+                    className="object-cover"
+                  />
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </section>
