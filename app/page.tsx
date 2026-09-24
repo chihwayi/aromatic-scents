@@ -981,16 +981,22 @@ export default function HomePage() {
                 Explore
               </h4>
               <ul className="space-y-3">
-                {['About Us', 'Our Story', 'Gift Cards', 'Fragrance Guide', 'Reseller Program'].map(l => (
-                  <li key={l}>
+                {[
+                  { label: 'About Us', href: '/about-us' },
+                  { label: 'Our Story', href: '/our-story' },
+                  { label: 'Gift Cards', href: '#' },
+                  { label: 'Fragrance Guide', href: '/fragrance-guide' },
+                  { label: 'Reseller Program', href: '/reseller-program' },
+                ].map(({ label, href }) => (
+                  <li key={href}>
                     <a
-                      href="#"
+                      href={href}
                       className="text-sm transition-colors duration-200"
                       style={{ color: 'var(--footer-text)', fontWeight: 400 }}
                       onMouseEnter={e => (e.currentTarget as HTMLAnchorElement).style.color = 'var(--gold)'}
                       onMouseLeave={e => (e.currentTarget as HTMLAnchorElement).style.color = 'var(--footer-text)'}
                     >
-                      {l}
+                      {label}
                     </a>
                   </li>
                 ))}
