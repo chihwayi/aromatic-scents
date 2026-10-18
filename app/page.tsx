@@ -20,6 +20,8 @@ interface ProductVariant {
   bulk_price: number | null
   bulk_min_quantity: number
   stock_quantity: number
+  discounted_price: number | null
+  discounted_bulk_price: number | null
 }
 
 interface Product {
@@ -32,6 +34,9 @@ interface Product {
   gender?: ProductGender | null
   fragrance_notes?: { top?: string; heart?: string; base?: string }
   product_variants: ProductVariant[]
+  discount_percent?: number | null
+  discount_active?: boolean
+  discount_ends_at?: string | null
 }
 
 interface CartItem {
@@ -218,17 +223,31 @@ export default function HomePage() {
     return { price: bulk ? variant.bulk_price! : variant.regular_price, isBulkPrice: !!bulk }
   }
 
+  // Layers a product-level sale discount on top of the bulk/regular price —
+  // this is what's actually charged, with originalPrice set when a discount
+  // is active so the UI can show a slashed-through price.
+  const getFinalPrice = (product: Product, variant: ProductVariant, quantity: number) => {
+    const { price, isBulkPrice } = getEffectivePrice(variant, quantity)
+    if (product.discount_active && product.discount_percent) {
+      const discounted = isBulkPrice ? variant.discounted_bulk_price : variant.discounted_price
+      if (discounted != null) {
+        return { price: discounted, originalPrice: price, isBulkPrice, discountPercent: product.discount_percent }
+      }
+    }
+    return { price, originalPrice: null as number | null, isBulkPrice, discountPercent: null as number | null }
+  }
+
   // ─── Cart helpers ──────────────────────────────────────────────────────────
   const addToCart = (product: Product) => {
     const variant = getSelectedVariant(product)
     if (!variant) return
-    const { price, isBulkPrice } = getEffectivePrice(variant, 1)
+    const { price, isBulkPrice } = getFinalPrice(product, variant, 1)
 
     setCart(prev => {
       const existing = prev.find(i => i.variantId === variant.id)
       if (existing) {
         const newQty = existing.quantity + 1
-        const { price: newPrice, isBulkPrice: newBulk } = getEffectivePrice(variant, newQty)
+        const { price: newPrice, isBulkPrice: newBulk } = getFinalPrice(product, variant, newQty)
         return prev.map(i =>
           i.variantId === variant.id
             ? { ...i, quantity: newQty, price: newPrice, isBulkPrice: newBulk }
@@ -250,8 +269,8 @@ export default function HomePage() {
         if (newQty <= 0) return null as unknown as CartItem
         const product = [...products, ...newArrivals].find(p => p.id === item.productId)
         const variant = product?.product_variants.find(v => v.id === variantId)
-        if (variant) {
-          const { price, isBulkPrice } = getEffectivePrice(variant, newQty)
+        if (product && variant) {
+          const { price, isBulkPrice } = getFinalPrice(product, variant, newQty)
           return { ...item, quantity: newQty, price, isBulkPrice }
         }
         return { ...item, quantity: newQty }
@@ -264,6 +283,17 @@ export default function HomePage() {
   }
 
   const allProducts = [...newArrivals, ...products]
+
+  // ─── Storewide sale banner ──────────────────────────────────────────────
+  const activeDiscounts = allProducts.filter(p => p.discount_active && p.discount_percent)
+  const maxDiscountPercent = activeDiscounts.reduce((max, p) => Math.max(max, p.discount_percent || 0), 0)
+  const saleEndsAt = activeDiscounts
+    .map(p => p.discount_ends_at)
+    .filter((d): d is string => !!d)
+    .sort()[0] || null
+  const saleEndsLabel = saleEndsAt
+    ? new Date(saleEndsAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long' })
+    : null
   const searchResults = searchQuery.trim()
     ? allProducts.filter(p => {
         const q = searchQuery.trim().toLowerCase()
@@ -386,6 +416,13 @@ export default function HomePage() {
           style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
         >
           Payment was cancelled. Your cart is still saved.
+        </div>
+      )}
+
+      {/* ─── Sale Banner ─────────────────────────────────────────────────── */}
+      {activeDiscounts.length > 0 && (
+        <div className="sale-banner animate-gold-pulse">
+          🔥 Sale — Up to {maxDiscountPercent}% Off{saleEndsLabel ? ` · Ends ${saleEndsLabel}` : ''}
         </div>
       )}
 
@@ -533,7 +570,7 @@ export default function HomePage() {
                         selectedVariants={selectedVariants}
                         setSelectedVariants={setSelectedVariants}
                         getSelectedVariant={getSelectedVariant}
-                        getEffectivePrice={getEffectivePrice}
+                        getFinalPrice={getFinalPrice}
                         customerType={customerType}
                         favorites={favorites}
                         toggleFavorite={toggleFavorite}
@@ -761,7 +798,7 @@ export default function HomePage() {
                   selectedVariants={selectedVariants}
                   setSelectedVariants={setSelectedVariants}
                   getSelectedVariant={getSelectedVariant}
-                  getEffectivePrice={getEffectivePrice}
+                  getFinalPrice={getFinalPrice}
                   customerType={customerType}
                   favorites={favorites}
                   toggleFavorite={toggleFavorite}
@@ -852,7 +889,7 @@ export default function HomePage() {
                       selectedVariants={selectedVariants}
                       setSelectedVariants={setSelectedVariants}
                       getSelectedVariant={getSelectedVariant}
-                      getEffectivePrice={getEffectivePrice}
+                      getFinalPrice={getFinalPrice}
                       customerType={customerType}
                       favorites={favorites}
                       toggleFavorite={toggleFavorite}
@@ -1563,7 +1600,7 @@ function ProductCard({
   selectedVariants,
   setSelectedVariants,
   getSelectedVariant,
-  getEffectivePrice,
+  getFinalPrice,
   customerType,
   favorites,
   toggleFavorite,
@@ -1576,7 +1613,7 @@ function ProductCard({
   selectedVariants: { [key: string]: string }
   setSelectedVariants: React.Dispatch<React.SetStateAction<{ [key: string]: string }>>
   getSelectedVariant: (p: Product) => ProductVariant | null
-  getEffectivePrice: (v: ProductVariant, q: number) => { price: number; isBulkPrice: boolean }
+  getFinalPrice: (p: Product, v: ProductVariant, q: number) => { price: number; originalPrice: number | null; isBulkPrice: boolean; discountPercent: number | null }
   customerType: 'regular' | 'reseller'
   favorites: string[]
   toggleFavorite: (id: string) => void
@@ -1587,7 +1624,7 @@ function ProductCard({
 }) {
   const { formatPrice }  = useCurrency()
   const selectedVariant  = getSelectedVariant(product)
-  const effectivePrice   = selectedVariant ? getEffectivePrice(selectedVariant, 1) : null
+  const effectivePrice   = selectedVariant ? getFinalPrice(product, selectedVariant, 1) : null
   const isOutOfStock     = !selectedVariant || selectedVariant.stock_quantity === 0
   const isLowStock       = selectedVariant && selectedVariant.stock_quantity > 0 && selectedVariant.stock_quantity <= 5
   const isFav            = favorites.includes(product.id)
@@ -1618,36 +1655,53 @@ function ProductCard({
         />
 
         {/* Badges */}
-        {isNew && (
-          <div
-            className="absolute top-3 left-3 px-2.5 py-1 text-xs"
-            style={{
-              background: 'var(--gold)',
-              color: '#fff',
-              letterSpacing: '0.15em',
-              textTransform: 'uppercase',
-              fontWeight: 500,
-              fontSize: '0.6rem',
-            }}
-          >
-            New
-          </div>
-        )}
-        {isLowStock && (
-          <div
-            className="absolute top-3 left-3 px-2.5 py-1 text-xs"
-            style={{
-              background: 'rgba(0,0,0,0.7)',
-              color: '#fff',
-              letterSpacing: '0.15em',
-              textTransform: 'uppercase',
-              fontWeight: 500,
-              fontSize: '0.6rem',
-            }}
-          >
-            Only {selectedVariant!.stock_quantity} left
-          </div>
-        )}
+        <div className="absolute top-3 left-3 flex flex-col items-start gap-1.5">
+          {effectivePrice?.discountPercent && (
+            <div
+              className="px-2.5 py-1 text-xs animate-gold-pulse"
+              style={{
+                background: 'var(--accent)',
+                color: '#fff',
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+                fontWeight: 600,
+                fontSize: '0.6rem',
+              }}
+            >
+              -{effectivePrice.discountPercent}% Sale
+            </div>
+          )}
+          {isNew && (
+            <div
+              className="px-2.5 py-1 text-xs"
+              style={{
+                background: 'var(--gold)',
+                color: '#fff',
+                letterSpacing: '0.15em',
+                textTransform: 'uppercase',
+                fontWeight: 500,
+                fontSize: '0.6rem',
+              }}
+            >
+              New
+            </div>
+          )}
+          {isLowStock && (
+            <div
+              className="px-2.5 py-1 text-xs"
+              style={{
+                background: 'rgba(0,0,0,0.7)',
+                color: '#fff',
+                letterSpacing: '0.15em',
+                textTransform: 'uppercase',
+                fontWeight: 500,
+                fontSize: '0.6rem',
+              }}
+            >
+              Only {selectedVariant!.stock_quantity} left
+            </div>
+          )}
+        </div>
 
         {/* Favourite */}
         <button
@@ -1734,16 +1788,24 @@ function ProductCard({
         {/* Price */}
         {selectedVariant && effectivePrice && (
           <div className="mb-3 sm:mb-5">
-            <div className="flex items-baseline gap-1 sm:gap-2">
+            <div className="flex items-baseline gap-1 sm:gap-2 flex-wrap">
               <span
                 className="font-display text-xl sm:text-3xl"
-                style={{ color: 'var(--gold)', fontWeight: 600 }}
+                style={{ color: effectivePrice.discountPercent ? 'var(--accent)' : 'var(--gold)', fontWeight: 600 }}
               >
                 {formatPrice(effectivePrice.price)}
               </span>
-              {effectivePrice.isBulkPrice && (
+              {(effectivePrice.originalPrice ?? (effectivePrice.isBulkPrice ? selectedVariant.regular_price : null)) != null && (
                 <span className="text-xs" style={{ color: 'var(--text-faint)', textDecoration: 'line-through' }}>
-                  {formatPrice(selectedVariant.regular_price)}
+                  {formatPrice(effectivePrice.originalPrice ?? selectedVariant.regular_price)}
+                </span>
+              )}
+              {effectivePrice.discountPercent && (
+                <span
+                  className="text-xs px-1.5 py-0.5 animate-gold-pulse"
+                  style={{ background: 'var(--accent)', color: '#fff', fontWeight: 600 }}
+                >
+                  -{effectivePrice.discountPercent}%
                 </span>
               )}
             </div>
@@ -1834,13 +1896,26 @@ function ProductCard({
               )}
 
               {selectedVariant && effectivePrice && (
-                <div className="flex items-baseline gap-2 mb-5">
+                <div className="flex items-baseline gap-2 mb-5 flex-wrap">
                   <span
                     className="font-display text-2xl"
-                    style={{ color: 'var(--gold)', fontWeight: 600 }}
+                    style={{ color: effectivePrice.discountPercent ? 'var(--accent)' : 'var(--gold)', fontWeight: 600 }}
                   >
                     {formatPrice(effectivePrice.price)}
                   </span>
+                  {effectivePrice.originalPrice != null && (
+                    <span className="text-sm" style={{ color: 'var(--text-faint)', textDecoration: 'line-through' }}>
+                      {formatPrice(effectivePrice.originalPrice)}
+                    </span>
+                  )}
+                  {effectivePrice.discountPercent && (
+                    <span
+                      className="text-xs px-1.5 py-0.5 animate-gold-pulse"
+                      style={{ background: 'var(--accent)', color: '#fff', fontWeight: 600 }}
+                    >
+                      -{effectivePrice.discountPercent}%
+                    </span>
+                  )}
                 </div>
               )}
 

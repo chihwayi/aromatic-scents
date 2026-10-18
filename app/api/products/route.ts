@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import type { Product, ProductVariant } from '@prisma/client'
+import { isDiscountActive, applyDiscount } from '@/lib/discount'
 
 // Define types for the request data
 interface ProductVariantInput {
@@ -25,6 +26,9 @@ interface ProductInput {
   category?: string
   gender?: string | null
   fragrance_notes?: FragranceNotesInput | null
+  discount_percent?: number | null
+  discount_starts_at?: string | null
+  discount_ends_at?: string | null
 }
 
 function serializeFragranceNotes(notes: FragranceNotesInput | null | undefined): string | null {
@@ -61,6 +65,13 @@ function isInternalImageRef(id: string, url: string): boolean {
 }
 
 function toProductDTO(product: Product & { variants: ProductVariant[] }) {
+  const discount = {
+    percent:  product.discountPercent,
+    startsAt: product.discountStartsAt?.toISOString() ?? null,
+    endsAt:   product.discountEndsAt?.toISOString() ?? null,
+  }
+  const discountActive = isDiscountActive(discount)
+
   return {
     id:             product.id,
     name:           product.name,
@@ -70,6 +81,10 @@ function toProductDTO(product: Product & { variants: ProductVariant[] }) {
     category:       product.category,
     gender:         product.gender,
     fragrance_notes: product.fragranceNotes ? JSON.parse(product.fragranceNotes) : null,
+    discount_percent:    product.discountPercent,
+    discount_starts_at:  discount.startsAt,
+    discount_ends_at:    discount.endsAt,
+    discount_active:     discountActive,
     created_at:     product.createdAt.toISOString(),
     updated_at:     product.updatedAt.toISOString(),
     product_variants: product.variants.map(v => ({
@@ -79,6 +94,12 @@ function toProductDTO(product: Product & { variants: ProductVariant[] }) {
       bulk_price:        v.bulkPrice,
       bulk_min_quantity: v.bulkMinQuantity,
       stock_quantity:    v.stockQuantity,
+      discounted_price:  discountActive && product.discountPercent
+        ? applyDiscount(v.regularPrice, product.discountPercent)
+        : null,
+      discounted_bulk_price: discountActive && product.discountPercent && v.bulkPrice
+        ? applyDiscount(v.bulkPrice, product.discountPercent)
+        : null,
     })),
   }
 }
@@ -113,6 +134,9 @@ export async function POST(request: NextRequest) {
         category:       product.category || 'perfume',
         gender:         product.gender || null,
         fragranceNotes: serializeFragranceNotes(product.fragrance_notes),
+        discountPercent:  product.discount_percent ?? null,
+        discountStartsAt: product.discount_starts_at ? new Date(product.discount_starts_at) : null,
+        discountEndsAt:   product.discount_ends_at ? new Date(product.discount_ends_at) : null,
         variants: {
           create: (variants || []).map(v => ({
             sizeMl:          v.size_ml,
@@ -158,6 +182,9 @@ export async function PUT(request: NextRequest) {
           category:       product.category || 'perfume',
           gender:         product.gender || null,
           fragranceNotes: serializeFragranceNotes(product.fragrance_notes),
+          discountPercent:  product.discount_percent ?? null,
+          discountStartsAt: product.discount_starts_at ? new Date(product.discount_starts_at) : null,
+          discountEndsAt:   product.discount_ends_at ? new Date(product.discount_ends_at) : null,
         },
       })
 

@@ -25,6 +25,11 @@ model Product {
   category      String   @default("perfume") // perfume | home_diffuser | tissue_oil | body_mist | car_diffuser | lotion
   gender        String?  // female | male | unisex — only meaningful when category is "perfume"
   fragranceNotes String? // Stored as JSON string: { top, heart, base }
+
+  discountPercent  Float?    // e.g. 20 for 20% off
+  discountStartsAt DateTime? // null = active immediately once discountPercent is set
+  discountEndsAt   DateTime? // null = runs indefinitely
+
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

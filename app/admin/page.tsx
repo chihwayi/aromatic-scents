@@ -40,6 +40,10 @@ interface Product {
   gender?: ProductGender | null
   fragrance_notes?: FragranceNotes | null
   product_variants?: ProductVariant[]
+  discount_percent?: number | null
+  discount_starts_at?: string | null
+  discount_ends_at?: string | null
+  discount_active?: boolean
 }
 
 function makeVariantsForCategory(category: ProductCategory, existing?: ProductVariant[]): ProductVariant[] {
@@ -47,6 +51,19 @@ function makeVariantsForCategory(category: ProductCategory, existing?: ProductVa
     const match = existing?.find(v => v.size_ml === size)
     return match || { size_ml: size, regular_price: 0, bulk_price: 0, bulk_min_quantity: 6, stock_quantity: 0 }
   })
+}
+
+// Converts an ISO datetime string to the format <input type="datetime-local">
+// expects (YYYY-MM-DDTHH:mm, in local time), or '' if null/undefined.
+function toDatetimeLocal(iso: string | null | undefined): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function formatCurrency(amount: number): string {
+  return `R${amount.toFixed(2)}`
 }
 
 interface AdminStats {
@@ -126,6 +143,7 @@ export default function AdminPanel() {
   const [loading, setLoading] = useState(true)
   const { data: session } = useSession()
   const [showSettings, setShowSettings] = useState(false)
+  const [showBulkDiscount, setShowBulkDiscount] = useState(false)
   const [settings, setSettings] = useState<AppSettings>({
     courier_locker_price: '80.00',
     courier_house_price: '140.00',
@@ -307,6 +325,9 @@ export default function AdminPanel() {
         category: product.category,
         gender: product.category === 'perfume' ? (product.gender || 'unisex') : null,
         fragrance_notes: product.fragrance_notes,
+        discount_percent: product.discount_percent || null,
+        discount_starts_at: product.discount_starts_at || null,
+        discount_ends_at: product.discount_ends_at || null,
       }
       const body = product.id
         ? { id: product.id, product: productInput, variants: product.product_variants }
@@ -589,6 +610,61 @@ export default function AdminPanel() {
           </div>
         )}
 
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
+          <h3 className="text-sm font-semibold text-gray-900 mb-3">Discount / Sale</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Discount %</label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="1"
+                value={formData.discount_percent ?? ''}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  discount_percent: e.target.value === '' ? null : Number(e.target.value),
+                })}
+                placeholder="e.g. 35"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all duration-300"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Starts (optional)</label>
+              <input
+                type="datetime-local"
+                value={toDatetimeLocal(formData.discount_starts_at)}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  discount_starts_at: e.target.value ? new Date(e.target.value).toISOString() : null,
+                })}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all duration-300"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Ends (optional)</label>
+              <input
+                type="datetime-local"
+                value={toDatetimeLocal(formData.discount_ends_at)}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  discount_ends_at: e.target.value ? new Date(e.target.value).toISOString() : null,
+                })}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all duration-300"
+              />
+            </div>
+          </div>
+          <p className="text-xs text-gray-500 mt-2">
+            Leave &quot;Starts&quot; blank to begin immediately, leave &quot;Ends&quot; blank to run indefinitely.
+            {formData.discount_percent ? (
+              <>
+                {' '}Example: a {formatCurrency(100)} item becomes{' '}
+                <strong>{formatCurrency(100 * (1 - formData.discount_percent / 100))}</strong>.
+              </>
+            ) : null}
+          </p>
+        </div>
+
         <div>
           <h3 className="text-lg font-medium text-gray-900 mb-4">Bottle Sizes & Pricing</h3>
           <div className="space-y-4">
@@ -659,6 +735,128 @@ export default function AdminPanel() {
           </button>
         </div>
       </form>
+    )
+  }
+
+  const BulkDiscountModal = ({ productCount, onClose, onApplied }: {
+    productCount: number
+    onClose: () => void
+    onApplied: () => void
+  }) => {
+    const [percent, setPercent] = useState<number | ''>(35)
+    const [startsAt, setStartsAt] = useState('')
+    const [endsAt, setEndsAt] = useState('')
+    const [isSaving, setIsSaving] = useState(false)
+
+    const apply = async () => {
+      setIsSaving(true)
+      try {
+        const res = await fetch('/api/products/bulk-discount', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            percent: percent === '' ? null : percent,
+            starts_at: startsAt ? new Date(startsAt).toISOString() : null,
+            ends_at: endsAt ? new Date(endsAt).toISOString() : null,
+          }),
+        })
+        if (!res.ok) throw new Error('Failed')
+        onApplied()
+      } catch {
+        alert('Failed to apply storewide discount. Please try again.')
+      } finally {
+        setIsSaving(false)
+      }
+    }
+
+    const clearAll = async () => {
+      setIsSaving(true)
+      try {
+        const res = await fetch('/api/products/bulk-discount', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ percent: null }),
+        })
+        if (!res.ok) throw new Error('Failed')
+        onApplied()
+      } catch {
+        alert('Failed to clear discounts. Please try again.')
+      } finally {
+        setIsSaving(false)
+      }
+    }
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto py-8">
+        <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">Storewide Sale</h3>
+          <p className="text-sm text-gray-500 mb-6">
+            Applies the same discount to all {productCount} products at once. You can still
+            override an individual product&apos;s discount afterward by editing it directly.
+          </p>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Discount %</label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="1"
+                value={percent}
+                onChange={(e) => setPercent(e.target.value === '' ? '' : Number(e.target.value))}
+                placeholder="e.g. 35"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all duration-300"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Starts (optional)</label>
+              <input
+                type="datetime-local"
+                value={startsAt}
+                onChange={(e) => setStartsAt(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all duration-300"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Ends (optional)</label>
+              <input
+                type="datetime-local"
+                value={endsAt}
+                onChange={(e) => setEndsAt(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all duration-300"
+              />
+            </div>
+            <p className="text-xs text-gray-500">
+              Leave &quot;Starts&quot; blank to begin immediately, leave &quot;Ends&quot; blank to run indefinitely.
+            </p>
+          </div>
+
+          <div className="flex gap-3 mt-8">
+            <button
+              onClick={onClose}
+              disabled={isSaving}
+              className="flex-1 px-4 py-3 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={clearAll}
+              disabled={isSaving}
+              className="flex-1 px-4 py-3 border border-red-300 rounded-xl text-red-600 hover:bg-red-50 transition-colors"
+            >
+              Clear All
+            </button>
+            <button
+              onClick={apply}
+              disabled={isSaving || percent === ''}
+              className="flex-1 px-4 py-3 bg-amber-500 text-white rounded-xl hover:bg-amber-600 transition-colors disabled:opacity-50"
+            >
+              {isSaving ? 'Applying…' : 'Apply to All'}
+            </button>
+          </div>
+        </div>
+      </div>
     )
   }
 
@@ -1352,7 +1550,7 @@ export default function AdminPanel() {
         {activeTab === 'products' && (
           <>
             {!isAddingNew && !editingProduct && (
-              <div className="mb-6">
+              <div className="mb-6 flex flex-wrap gap-3">
                 <button
                   onClick={() => setIsAddingNew(true)}
                   className="flex items-center px-8 py-4 bg-gradient-to-r from-rose-500 to-amber-500 text-white rounded-xl hover:from-rose-600 hover:to-amber-600 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
@@ -1360,7 +1558,21 @@ export default function AdminPanel() {
                   <Plus className="h-5 w-5 mr-2" />
                   Add New Product
                 </button>
+                <button
+                  onClick={() => setShowBulkDiscount(true)}
+                  className="flex items-center px-8 py-4 bg-amber-500 text-white rounded-xl hover:bg-amber-600 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
+                >
+                  Storewide Sale
+                </button>
               </div>
+            )}
+
+            {showBulkDiscount && (
+              <BulkDiscountModal
+                productCount={products.length}
+                onClose={() => setShowBulkDiscount(false)}
+                onApplied={() => { setShowBulkDiscount(false); fetchProducts() }}
+              />
             )}
 
             {isAddingNew && (
@@ -1426,6 +1638,16 @@ export default function AdminPanel() {
                             {product.is_new_arrival && (
                               <span className="px-2 py-1 bg-gradient-to-r from-rose-500 to-amber-500 text-white text-xs rounded-full font-medium">
                                 NEW
+                              </span>
+                            )}
+                            {product.discount_active && (
+                              <span className="px-2 py-1 bg-amber-500 text-white text-xs rounded-full font-medium">
+                                -{product.discount_percent}% SALE
+                              </span>
+                            )}
+                            {!product.discount_active && product.discount_percent && (
+                              <span className="px-2 py-1 bg-gray-100 text-gray-500 text-xs rounded-full font-medium">
+                                Sale scheduled
                               </span>
                             )}
                           </div>
